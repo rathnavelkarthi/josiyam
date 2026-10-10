@@ -1,0 +1,6 @@
+{
+  "name": "Jyotisha",
+  "description": "South Indian astrology, Vedic charts, Panchangam, and cosmic intelligence platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
