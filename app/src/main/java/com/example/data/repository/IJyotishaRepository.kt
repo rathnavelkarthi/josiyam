@@ -33,7 +33,7 @@ interface IJyotishaRepository {
 
     fun signIn(email: String, password: String): Boolean
     fun signUp(email: String, password: String): Boolean
-    fun signInWithGoogle(): Boolean
+    fun signInWithGoogle(context: android.content.Context? = null): Boolean
     fun signOut()
     fun setLanguage(language: AppLanguage)
     fun completeOnboarding(profile: BirthProfile)

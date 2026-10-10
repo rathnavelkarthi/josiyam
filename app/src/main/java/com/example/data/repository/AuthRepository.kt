@@ -128,6 +128,24 @@ class AuthRepository(
                 val user = authResult.user ?: return Result.failure(IllegalStateException("FirebaseUser is null after Google credential"))
                 _currentUser.value = user
                 _isAuthenticated.value = true
+
+                // Immediately check Firestore and cache existing birth profile
+                try {
+                    val bpRepo = BirthProfileRepository.getInstance(context)
+                    val fetchResult = bpRepo.fetchProfiles()
+                    if (fetchResult.isSuccess) {
+                        val profiles = fetchResult.getOrDefault(emptyList())
+                        if (profiles.isNotEmpty()) {
+                            val mainRepo = JyotishaRepository.getInstance()
+                            profiles.forEach { profile ->
+                                mainRepo.saveProfile(profile)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to auto-cache birth profiles after Google Sign-in", e)
+                }
+
                 Result.success(user)
             } else {
                 Result.failure(IllegalStateException("Unexpected credential type: ${credential.type}"))

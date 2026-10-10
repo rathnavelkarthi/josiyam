@@ -429,7 +429,7 @@ fun PredictionLedgerScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(pred.plainInterpretation, fontSize = 13.sp, color = CelestialTextSecondary)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("🔒 Immutable server-recorded timestamp prior to outcome", fontSize = 11.sp, color = CelestialPositive)
+                        Text("🔒 Stored privately in local profile database", fontSize = 11.sp, color = CelestialPositive)
 
                         Spacer(modifier = Modifier.height(10.dp))
                         Button(

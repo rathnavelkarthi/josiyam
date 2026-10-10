@@ -28,6 +28,8 @@ import com.example.data.models.BirthProfile
 import com.example.data.models.BirthTimeConfidence
 import com.example.ui.components.*
 import com.example.ui.theme.*
+import com.example.ui.viewmodel.BirthProfileSetupViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -37,20 +39,24 @@ import java.util.Locale
 fun BirthProfileStepperScreen(
     onProfileSaved: (BirthProfile) -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    setupViewModel: BirthProfileSetupViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val uiState by setupViewModel.uiState.collectAsState()
+
     var step by remember { mutableIntStateOf(1) } // 1, 2, or 3
-    var name by remember { mutableStateOf("") }
-    var dateOfBirth by remember { mutableStateOf("") }
-    var timeOfBirth by remember { mutableStateOf("") }
-    var confidence by remember { mutableStateOf(BirthTimeConfidence.EXACT) }
+    var name by remember { mutableStateOf(uiState.name) }
+    var dateOfBirth by remember { mutableStateOf(uiState.dateOfBirth) }
+    var timeOfBirth by remember { mutableStateOf(uiState.timeOfBirth) }
+    var confidence by remember { mutableStateOf(uiState.confidence) }
 
-    var placeQuery by remember { mutableStateOf("Chennai, Tamil Nadu, India") }
-    var latitude by remember { mutableDoubleStateOf(13.0827) }
-    var longitude by remember { mutableDoubleStateOf(80.2707) }
-    var timezoneId by remember { mutableStateOf("Asia/Kolkata (GMT+05:30)") }
+    var placeQuery by remember { mutableStateOf(uiState.placeName) }
+    var latitude by remember { mutableDoubleStateOf(uiState.latitude) }
+    var longitude by remember { mutableDoubleStateOf(uiState.longitude) }
+    var timezoneId by remember { mutableStateOf(uiState.timezoneId) }
 
-    var isDefault by remember { mutableStateOf(true) }
+    var isDefault by remember { mutableStateOf(uiState.isDefault) }
     var isCalculating by remember { mutableStateOf(false) }
 
     val citySuggestions = listOf(
@@ -65,20 +71,15 @@ fun BirthProfileStepperScreen(
 
     LaunchedEffect(isCalculating) {
         if (isCalculating) {
-            delay(1200) // Brief graceful celestial calculation animation
-            val profile = BirthProfile(
-                id = "profile_${System.currentTimeMillis()}",
-                name = name,
-                dateOfBirth = dateOfBirth,
-                timeOfBirth = timeOfBirth,
-                timeConfidence = confidence,
-                placeName = placeQuery,
-                latitude = latitude,
-                longitude = longitude,
-                timezoneId = timezoneId,
-                isDefault = isDefault
-            )
-            onProfileSaved(profile)
+            setupViewModel.updateName(name)
+            setupViewModel.updateDateOfBirth(dateOfBirth)
+            setupViewModel.updateTimeOfBirth(timeOfBirth)
+            setupViewModel.updateConfidence(confidence)
+            setupViewModel.updateLocation(placeQuery, latitude, longitude, timezoneId)
+
+            setupViewModel.saveProfile(context) { savedProfile ->
+                onProfileSaved(savedProfile)
+            }
         }
     }
 

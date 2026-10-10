@@ -170,6 +170,42 @@ fun ReadingReportScreen(
 
                             Spacer(modifier = Modifier.height(14.dp))
 
+                            // Deep Life Narrative (3-4 Page Perspective Guidance)
+                            CelestialCard(
+                                backgroundColor = CelestialSurface3,
+                                borderColor = CelestialGold.copy(alpha = 0.5f)
+                            ) {
+                                Text(
+                                    text = "📖 Comprehensive Life Narrative & Observer Perspective",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CelestialGold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "1. External Perception (How Others Witness You):\nWhen an observer sits beside you in professional or personal life, they perceive an intensely focused, discerning presence. You convey quiet authority, but inner perfectionism can sometimes be misread as detachment.",
+                                    fontSize = 13.sp,
+                                    color = CelestialTextPrimary,
+                                    lineHeight = 19.sp
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "2. Historical Crossroads & Past Choices:\nIn previous Dasa cycles, significant turning points tested your fortitude. You faced moments where stepping back or holding steady was wiser than aggressive expansion. Those lessons established your current foundational stability.",
+                                    fontSize = 13.sp,
+                                    color = CelestialTextPrimary,
+                                    lineHeight = 19.sp
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "3. Strategic Growth Path Ahead:\nMoving forward, align major life choices with waxing lunar cycles and benefic transit periods. Rather than seeking immediate outward validation, focus on long-term mastery, disciplined communication, and inner peace.",
+                                    fontSize = 13.sp,
+                                    color = CelestialTextPrimary,
+                                    lineHeight = 19.sp
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()

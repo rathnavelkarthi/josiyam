@@ -191,9 +191,25 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
                     _hasCompletedOnboarding.value = true
                     recalculateChart(active, _selectedTradition.value)
                 } else {
-                    _hasCompletedOnboarding.value = savedOnboarding
-                    // Seed initial profile in room
-                    dao?.insertProfile(BirthProfileEntity.fromDomain(defaultProfile))
+                    // Try fetching from Firestore if user is logged in
+                    val bpRepo = BirthProfileRepository.getInstance(app)
+                    val fsResult = bpRepo.fetchProfiles()
+                    if (fsResult.isSuccess && fsResult.getOrDefault(emptyList()).isNotEmpty()) {
+                        val fsProfiles = fsResult.getOrDefault(emptyList())
+                        _profiles.value = fsProfiles
+                        val active = fsProfiles.find { it.isDefault } ?: fsProfiles.first()
+                        _activeProfile.value = active
+                        _hasCompletedOnboarding.value = true
+                        sharedPrefs?.edit()?.putBoolean("has_completed_onboarding", true)?.apply()
+                        recalculateChart(active, _selectedTradition.value)
+                        fsProfiles.forEach { p ->
+                            dao?.insertProfile(BirthProfileEntity.fromDomain(p))
+                        }
+                    } else {
+                        _hasCompletedOnboarding.value = savedOnboarding
+                        // Seed initial profile in room
+                        dao?.insertProfile(BirthProfileEntity.fromDomain(defaultProfile))
+                    }
                 }
             } catch (e: Exception) {
                 _hasCompletedOnboarding.value = savedOnboarding
@@ -244,12 +260,31 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
         return true
     }
 
-    override fun signInWithGoogle(): Boolean {
+    override fun signInWithGoogle(context: Context?): Boolean {
         _isAuthenticated.value = true
-        val user = firebaseAuth?.currentUser
-        val email = user?.email ?: "rathnavelkarthi1@gmail.com"
-        _activeUserEmail.value = email
-        sharedPrefs?.edit()?.putString("active_user_email", email)?.apply()
+        if (context != null) {
+            scope.launch {
+                try {
+                    val authRepo = AuthRepository.getInstance()
+                    val result = authRepo.signInWithGoogle(context)
+                    if (result.isSuccess) {
+                        val user = result.getOrNull()
+                        val email = user?.email
+                        if (email != null) {
+                            _activeUserEmail.value = email
+                            sharedPrefs?.edit()?.putString("active_user_email", email)?.apply()
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("JyotishaRepo", "Google sign in error", e)
+                }
+            }
+        } else {
+            val user = firebaseAuth?.currentUser
+            val email = user?.email ?: "user@example.com"
+            _activeUserEmail.value = email
+            sharedPrefs?.edit()?.putString("active_user_email", email)?.apply()
+        }
         return true
     }
 

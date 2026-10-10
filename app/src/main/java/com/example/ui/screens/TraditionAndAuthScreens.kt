@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -320,11 +321,12 @@ fun AuthScreen(
     initialIsSignUp: Boolean = true,
     onSignIn: (email: String, pass: String) -> Unit = { _, _ -> },
     onSignUp: (email: String, pass: String) -> Unit = { _, _ -> },
-    onGoogleSignIn: () -> Unit = {},
+    onGoogleSignIn: (android.content.Context) -> Unit = {},
     onAuthSuccess: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var isSignUp by remember { mutableStateOf(initialIsSignUp) }
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -399,7 +401,7 @@ fun AuthScreen(
             // Google Sign In (Highlighted)
             Button(
                 onClick = {
-                    onGoogleSignIn()
+                    onGoogleSignIn(context)
                     onAuthSuccess()
                 },
                 shape = RoundedCornerShape(16.dp),

@@ -18,6 +18,7 @@ import com.example.ui.components.JyotishaBottomNavBar
 import com.example.ui.screens.*
 import com.example.ui.theme.CelestialBg
 import com.example.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.launch
 
 sealed interface Screen {
     data object Splash : Screen
@@ -90,24 +91,56 @@ fun JyotishaApp() {
     val evaluationSummary by repository.evaluationSummary.collectAsStateWithLifecycle()
     val hasCompletedOnboarding by repository.hasCompletedOnboarding.collectAsStateWithLifecycle()
     val selectedLanguage by repository.selectedLanguage.collectAsStateWithLifecycle()
+    val isAuthenticated by repository.isAuthenticated.collectAsStateWithLifecycle()
     val activeUserEmail by repository.activeUserEmail.collectAsStateWithLifecycle()
 
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Splash) }
     var currentMainDestination by remember { mutableStateOf(AppDestination.HOME) }
 
-    // Handle Back Press across screens
-    BackHandler(enabled = currentScreen !is Screen.Splash && currentScreen !is Screen.Main) {
-        currentScreen = when (currentScreen) {
+    // AuthStateListener logic: Auto-redirect authenticated users directly to Home
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(isAuthenticated, hasCompletedOnboarding) {
+        if (isAuthenticated && (currentScreen is Screen.Splash || currentScreen is Screen.Welcome || currentScreen is Screen.Auth || currentScreen is Screen.TraditionSelect)) {
+            val bpRepo = com.example.data.repository.BirthProfileRepository.getInstance(context)
+            val profileExists = bpRepo.checkProfileExists()
+            if (profileExists || hasCompletedOnboarding) {
+                val fetchResult = bpRepo.fetchProfiles()
+                if (fetchResult.isSuccess && fetchResult.getOrDefault(emptyList()).isNotEmpty()) {
+                    fetchResult.getOrDefault(emptyList()).forEach { p ->
+                        repository.saveProfile(p)
+                    }
+                }
+                currentScreen = Screen.Main(AppDestination.HOME)
+            }
+        }
+    }
+
+    // Handle Back Press across screens safely without logging out
+    BackHandler(enabled = currentScreen !is Screen.Splash && (currentScreen !is Screen.Main || currentMainDestination != AppDestination.HOME)) {
+        currentScreen = when (val s = currentScreen) {
             is Screen.Welcome -> Screen.Splash
             is Screen.TraditionSelect -> Screen.Welcome
             is Screen.Auth -> Screen.TraditionSelect
-            is Screen.BirthProfileStepper -> Screen.Auth
+            is Screen.BirthProfileStepper -> Screen.Main(AppDestination.HOME)
             is Screen.ReadingDetail -> Screen.Main(currentMainDestination)
             is Screen.RemediesDetail -> activeReading?.let { Screen.ReadingDetail(it) } ?: Screen.Main(currentMainDestination)
             is Screen.BodyPatterns -> Screen.Main(currentMainDestination)
             is Screen.PanchangamDetail -> Screen.Main(currentMainDestination)
             is Screen.SiddhaAi -> Screen.Main(currentMainDestination)
             is Screen.NumerologyAndScan -> Screen.Main(currentMainDestination)
+            is Screen.CameraCapture -> Screen.NumerologyAndScan
+            is Screen.LifeTimeline -> Screen.Main(AppDestination.HOME)
+            is Screen.RetrospectiveDetail -> Screen.LifeTimeline
+            is Screen.PredictionLedger -> Screen.LifeTimeline
+            is Screen.EvaluationSummaryRoute -> Screen.PredictionLedger
+            is Screen.Main -> {
+                if (currentMainDestination != AppDestination.HOME) {
+                    currentMainDestination = AppDestination.HOME
+                    Screen.Main(AppDestination.HOME)
+                } else {
+                    Screen.Main(AppDestination.HOME)
+                }
+            }
             else -> Screen.Main(AppDestination.HOME)
         }
     }
@@ -169,15 +202,26 @@ fun JyotishaApp() {
                     }
 
                     is Screen.Auth -> {
+                        val coroutineScope = rememberCoroutineScope()
                         AuthScreen(
                             onSignIn = { email, pass -> repository.signIn(email, pass) },
                             onSignUp = { email, pass -> repository.signUp(email, pass) },
-                            onGoogleSignIn = { repository.signInWithGoogle() },
+                            onGoogleSignIn = { ctx -> repository.signInWithGoogle(ctx) },
                             onAuthSuccess = {
-                                currentScreen = if (hasCompletedOnboarding) {
-                                    Screen.Main(AppDestination.HOME)
-                                } else {
-                                    Screen.BirthProfileStepper
+                                coroutineScope.launch {
+                                    val bpRepo = com.example.data.repository.BirthProfileRepository.getInstance(context)
+                                    val profileExists = bpRepo.checkProfileExists()
+                                    if (profileExists || hasCompletedOnboarding) {
+                                        val fetchResult = bpRepo.fetchProfiles()
+                                        if (fetchResult.isSuccess && fetchResult.getOrDefault(emptyList()).isNotEmpty()) {
+                                            fetchResult.getOrDefault(emptyList()).forEach { p ->
+                                                repository.saveProfile(p)
+                                            }
+                                        }
+                                        currentScreen = Screen.Main(AppDestination.HOME)
+                                    } else {
+                                        currentScreen = Screen.BirthProfileStepper
+                                    }
                                 }
                             },
                             onBack = { currentScreen = Screen.TraditionSelect }

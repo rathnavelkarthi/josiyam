@@ -141,7 +141,7 @@ fun HomeScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "♎",
+                                text = chart.moonSign.symbol,
                                 fontSize = 22.sp,
                                 color = CelestialGoldStrong
                             )

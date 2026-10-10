@@ -135,6 +135,23 @@ class BirthProfileRepository(
         }
     }
 
+    suspend fun checkProfileExists(): Boolean {
+        val uid = getCurrentUserId() ?: return false
+        val fs = firestore ?: return false
+        return try {
+            val snapshot = fs.collection("users")
+                .document(uid)
+                .collection("birth_profiles")
+                .limit(1)
+                .get()
+                .await()
+            !snapshot.isEmpty
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking profile existence in Firestore", e)
+            false
+        }
+    }
+
     suspend fun deleteProfile(profileId: String): Result<Unit> {
         val uid = getCurrentUserId() ?: return Result.failure(IllegalStateException("User not authenticated"))
         val fs = firestore ?: return Result.failure(IllegalStateException("Firestore not configured"))
