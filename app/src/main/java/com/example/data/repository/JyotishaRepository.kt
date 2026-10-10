@@ -183,7 +183,7 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
                 val dao = roomDatabase?.jyotishaDao()
                 val cachedProfiles = dao?.getAllProfiles()
                 if (!cachedProfiles.isNullOrEmpty()) {
-                    val domainList = cachedProfiles.map { it.toDomain() }
+                    val domainList = cachedProfiles.map { it.toDomain() }.distinctBy { it.id }
                     _profiles.value = domainList
                     val activeId = sharedPrefs?.getString("active_profile_id", null)
                     val active = domainList.find { it.id == activeId } ?: domainList.first()
@@ -195,7 +195,7 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
                     val bpRepo = BirthProfileRepository.getInstance(app)
                     val fsResult = bpRepo.fetchProfiles()
                     if (fsResult.isSuccess && fsResult.getOrDefault(emptyList()).isNotEmpty()) {
-                        val fsProfiles = fsResult.getOrDefault(emptyList())
+                        val fsProfiles = fsResult.getOrDefault(emptyList()).distinctBy { it.id }
                         _profiles.value = fsProfiles
                         val active = fsProfiles.find { it.isDefault } ?: fsProfiles.first()
                         _activeProfile.value = active
@@ -310,11 +310,17 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
 
     override fun saveProfile(profile: BirthProfile) {
         val updated = _profiles.value.toMutableList()
-        val index = updated.indexOfFirst { it.id == profile.id }
+        // Deduplicate by ID or matching name + dateOfBirth
+        val index = updated.indexOfFirst { it.id == profile.id || (it.name.trim().equals(profile.name.trim(), ignoreCase = true) && it.dateOfBirth.trim() == profile.dateOfBirth.trim()) }
         if (index >= 0) {
-            updated[index] = profile
+            updated[index] = profile.copy(id = updated[index].id)
         } else {
-            updated.add(profile)
+            // If replacing default seed profile
+            if (updated.size == 1 && updated[0].id == "profile_default") {
+                updated[0] = profile
+            } else {
+                updated.add(profile)
+            }
         }
         _profiles.value = updated
         _activeProfile.value = profile

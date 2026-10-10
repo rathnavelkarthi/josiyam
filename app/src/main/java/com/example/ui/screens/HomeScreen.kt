@@ -148,11 +148,11 @@ fun HomeScreen(
                         }
                         Spacer(modifier = Modifier.width(14.dp))
                         Column {
-                            CelestialBadge(text = "VEDIC SIDEREAL (LAHIRI)", color = CelestialGold)
+                            CelestialBadge(text = chart.tradition.label.uppercase(), color = CelestialGold)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "${chart.moonSign.tamilName} (${chart.moonSign.englishName})",
-                                fontSize = 18.sp,
+                                text = "${chart.moonSign.sanskritName} / ${chart.moonSign.englishName} (${chart.moonSign.tamilName})",
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = CelestialTextPrimary
                             )
