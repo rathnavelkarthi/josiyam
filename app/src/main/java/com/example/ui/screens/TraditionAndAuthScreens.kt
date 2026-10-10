@@ -318,14 +318,17 @@ private fun CalendarOptionCard(
 @Composable
 fun AuthScreen(
     initialIsSignUp: Boolean = true,
+    onSignIn: (email: String, pass: String) -> Unit = { _, _ -> },
+    onSignUp: (email: String, pass: String) -> Unit = { _, _ -> },
+    onGoogleSignIn: () -> Unit = {},
     onAuthSuccess: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isSignUp by remember { mutableStateOf(initialIsSignUp) }
-    var name by remember { mutableStateOf("Rathnavel") }
-    var email by remember { mutableStateOf("rathnavelkarthi1@gmail.com") }
-    var password by remember { mutableStateOf("Jyotisha#2026") }
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var agreedToTerms by remember { mutableStateOf(true) }
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
@@ -395,7 +398,10 @@ fun AuthScreen(
 
             // Google Sign In (Highlighted)
             Button(
-                onClick = onAuthSuccess,
+                onClick = {
+                    onGoogleSignIn()
+                    onAuthSuccess()
+                },
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.White,
@@ -586,8 +592,23 @@ fun AuthScreen(
 
             CelestialButton(
                 text = if (isSignUp) "Create Account" else "Sign In",
-                onClick = onAuthSuccess,
+                onClick = {
+                    if (isSignUp) {
+                        onSignUp(email, password)
+                    } else {
+                        onSignIn(email, password)
+                    }
+                    onAuthSuccess()
+                },
                 testTag = "auth_submit_button"
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            CelestialOutlinedButton(
+                text = "Continue as Guest",
+                onClick = onAuthSuccess,
+                testTag = "auth_guest_button"
             )
 
             Spacer(modifier = Modifier.height(16.dp))

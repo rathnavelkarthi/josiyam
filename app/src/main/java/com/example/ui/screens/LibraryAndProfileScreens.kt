@@ -27,6 +27,7 @@ import com.example.data.models.*
 import com.example.ui.components.CelestialBackground
 import com.example.ui.components.CelestialBadge
 import com.example.ui.components.CelestialButton
+import com.example.ui.components.CelestialOutlinedButton
 import com.example.ui.components.CelestialCard
 import com.example.ui.components.DemoDisclaimerBadge
 import com.example.ui.theme.*
@@ -361,13 +362,20 @@ fun ProfileScreen(
     tradition: AstrologyTradition,
     calendar: CalendarConvention,
     credits: Int,
+    userEmail: String? = null,
+    currentLanguage: com.example.data.localization.AppLanguage = com.example.data.localization.AppLanguage.ENGLISH,
+    onChangeLanguage: (com.example.data.localization.AppLanguage) -> Unit = {},
+    onSelectProfile: (BirthProfile) -> Unit = {},
     onEditProfile: () -> Unit,
     onAddProfile: () -> Unit,
+    onDeleteProfile: (String) -> Unit = {},
     onChangeTradition: () -> Unit,
     onRechargeCredits: () -> Unit,
+    onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showExportDialog by remember { mutableStateOf(false) }
+    var profileToDelete by remember { mutableStateOf<BirthProfile?>(null) }
 
     CelestialBackground(modifier = modifier) {
         Column(
@@ -414,8 +422,8 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column {
                             Text(profile.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = CelestialTextPrimary)
-                            Text("rathnavelkarthi1@gmail.com", fontSize = 12.5.sp, color = CelestialTextSecondary)
-                            Text("Default Profile • Thula Rasi", fontSize = 11.5.sp, color = CelestialSky)
+                            Text(userEmail ?: "Verified User", fontSize = 12.5.sp, color = CelestialTextSecondary)
+                            Text("Active Profile • Verified Calculation", fontSize = 11.5.sp, color = CelestialSky)
                         }
                     }
                     TextButton(onClick = onEditProfile) {
@@ -424,7 +432,52 @@ fun ProfileScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Language Selection Card
+            Text(
+                text = "APP LANGUAGE / மொழி",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = CelestialGold,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                com.example.data.localization.AppLanguage.entries.forEach { lang ->
+                    val isSelected = currentLanguage == lang
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSelected) CelestialGoldWash else CelestialSurface2)
+                            .border(1.dp, if (isSelected) CelestialGold else CelestialBorder, RoundedCornerShape(12.dp))
+                            .clickable { onChangeLanguage(lang) }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = lang.nativeName,
+                                fontSize = 13.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) CelestialGoldStrong else CelestialTextPrimary
+                            )
+                            Text(
+                                text = lang.englishName,
+                                fontSize = 10.sp,
+                                color = CelestialTextMuted
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
 
             // Saved Birth Profiles
             Text(
@@ -437,7 +490,12 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             allProfiles.forEach { p ->
-                CelestialCard(backgroundColor = CelestialSurface2) {
+                val isActive = p.id == profile.id
+                CelestialCard(
+                    backgroundColor = if (isActive) CelestialSurface3 else CelestialSurface2,
+                    borderColor = if (isActive) CelestialGold else CelestialBorder,
+                    onClick = { onSelectProfile(p) }
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -446,7 +504,10 @@ fun ProfileScreen(
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(p.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CelestialTextPrimary)
-                                if (p.isDefault) {
+                                if (isActive) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    CelestialBadge(text = "ACTIVE", color = CelestialGold)
+                                } else if (p.isDefault) {
                                     Spacer(modifier = Modifier.width(8.dp))
                                     CelestialBadge(text = "DEFAULT", color = CelestialPositive)
                                 }
@@ -455,8 +516,16 @@ fun ProfileScreen(
                             Text("${p.dateOfBirth} at ${p.timeOfBirth}", fontSize = 12.5.sp, color = CelestialTextSecondary)
                             Text(p.placeName, fontSize = 11.5.sp, color = CelestialTextMuted)
                         }
-                        IconButton(onClick = onEditProfile) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = CelestialTextMuted, modifier = Modifier.size(18.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = onEditProfile) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = CelestialTextMuted, modifier = Modifier.size(18.dp))
+                            }
+                            IconButton(
+                                onClick = { profileToDelete = p },
+                                modifier = Modifier.testTag("delete_profile_${p.id}")
+                            ) {
+                                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete Profile", tint = CelestialNegative, modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
                 }
@@ -566,6 +635,15 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            CelestialOutlinedButton(
+                text = "Sign Out of Account",
+                onClick = onSignOut,
+                modifier = Modifier.fillMaxWidth(),
+                testTag = "profile_sign_out_button"
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             DemoDisclaimerBadge(text = "Ephemeral local storage • Zero telemetry • Private by design")
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -594,6 +672,41 @@ fun ProfileScreen(
             dismissButton = {
                 TextButton(onClick = { showExportDialog = false }) {
                     Text("Close", color = CelestialTextMuted)
+                }
+            }
+        )
+    }
+
+    profileToDelete?.let { targetProfile ->
+        AlertDialog(
+            onDismissRequest = { profileToDelete = null },
+            containerColor = CelestialSurface2,
+            title = {
+                Text("Delete Profile?", color = CelestialNegative, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "Are you sure you want to permanently delete \"${targetProfile.name}\" and all its calculated charts, numerology analyses, and associated readings? This cannot be undone.",
+                    color = CelestialTextPrimary,
+                    fontSize = 13.5.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val id = targetProfile.id
+                        profileToDelete = null
+                        onDeleteProfile(id)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CelestialNegative),
+                    modifier = Modifier.testTag("confirm_delete_profile_btn")
+                ) {
+                    Text("Delete Permanently", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { profileToDelete = null }) {
+                    Text("Cancel", color = CelestialTextSecondary)
                 }
             }
         )

@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import com.example.data.localization.AppLanguage
 import com.example.data.models.*
 import kotlinx.coroutines.flow.StateFlow
 
@@ -11,6 +12,8 @@ interface IJyotishaRepository {
     val selectedCalendar: StateFlow<CalendarConvention>
     val isAuthenticated: StateFlow<Boolean>
     val activeUserEmail: StateFlow<String?>
+    val hasCompletedOnboarding: StateFlow<Boolean>
+    val selectedLanguage: StateFlow<AppLanguage>
     val panchangam: StateFlow<PanchangamSnapshot>
     val readings: StateFlow<List<ReadingReport>>
     val activeReading: StateFlow<ReadingReport?>
@@ -29,11 +32,16 @@ interface IJyotishaRepository {
     val evaluationSummary: StateFlow<EvaluationSummary>
 
     fun signIn(email: String, password: String): Boolean
+    fun signUp(email: String, password: String): Boolean
     fun signInWithGoogle(): Boolean
     fun signOut()
+    fun setLanguage(language: AppLanguage)
+    fun completeOnboarding(profile: BirthProfile)
     fun updateTradition(tradition: AstrologyTradition)
     fun updateCalendar(convention: CalendarConvention)
     fun saveProfile(profile: BirthProfile)
+    fun deleteProfile(profileId: String)
+    fun selectActiveProfile(profileId: String)
     fun recalculateChart(profile: BirthProfile? = null, tradition: AstrologyTradition? = null)
     fun toggleDemoMode()
     fun setActiveReading(reading: ReadingReport)

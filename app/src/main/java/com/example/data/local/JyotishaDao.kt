@@ -23,6 +23,12 @@ interface JyotishaDao {
     @Delete
     suspend fun deleteProfile(profile: BirthProfileEntity)
 
+    @Query("DELETE FROM birth_profiles WHERE id = :id")
+    suspend fun deleteProfileById(id: String)
+
+    @Query("DELETE FROM chart_calculations WHERE birthProfileId = :profileId")
+    suspend fun deleteChartsByProfileId(profileId: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChart(chart: ChartCalculationEntity)
 

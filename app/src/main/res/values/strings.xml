@@ -1,3 +1,37 @@
 <resources>
     <string name="app_name">Jyotisha</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_chart">Chart</string>
+    <string name="nav_panchangam">Panchangam</string>
+    <string name="nav_ask">Siddha AI</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_profile">Profile</string>
+    <string name="btn_continue">Continue</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_sign_in">Sign In</string>
+    <string name="btn_sign_out">Sign Out</string>
+    <string name="btn_delete">Delete</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_pick_date">Pick Date</string>
+    <string name="btn_pick_time">Pick Time</string>
+    <string name="btn_add_life_event">Add Life Event</string>
+    <string name="btn_add_family_member">Add Family Member Chart</string>
+    <string name="tradition_vedic">Vedic Sidereal (Lahiri)</string>
+    <string name="tradition_tropical">Western Tropical</string>
+    <string name="time_confidence_exact">Exact (to minute)</string>
+    <string name="time_confidence_approx">Approximate (30-60 min)</string>
+    <string name="time_confidence_unknown">Unknown Time</string>
+    <string name="title_profile_settings">Profile &amp; Settings</string>
+    <string name="title_life_timeline">Life Timeline &amp; Retrospective</string>
+    <string name="title_prediction_ledger">Prediction Ledger</string>
+    <string name="title_evaluation_summary">Evaluation Summary</string>
+    <string name="label_date_of_birth">Date of Birth</string>
+    <string name="label_time_of_birth">Time of Birth</string>
+    <string name="label_place_of_birth">Place of Birth</string>
+    <string name="label_event_title">Event Title</string>
+    <string name="label_event_date">Event Date</string>
+    <string name="label_event_category">Category</string>
+    <string name="dialog_delete_profile_title">Delete Profile?</string>
+    <string name="dialog_delete_profile_desc">Are you sure you want to permanently delete this profile and all its calculated charts, numerology analyses, and associated records? This cannot be undone.</string>
+    <string name="default_web_client_id" translatable="false">985880175104-o7cpphr35aubdicch9hgmtvbil8ngqp5.apps.googleusercontent.com</string>
 </resources>

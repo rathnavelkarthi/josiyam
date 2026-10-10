@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -26,6 +29,9 @@ import com.example.data.models.BirthTimeConfidence
 import com.example.ui.components.*
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun BirthProfileStepperScreen(
@@ -34,9 +40,9 @@ fun BirthProfileStepperScreen(
     modifier: Modifier = Modifier
 ) {
     var step by remember { mutableIntStateOf(1) } // 1, 2, or 3
-    var name by remember { mutableStateOf("Rathnavel") }
-    var dateOfBirth by remember { mutableStateOf("24 Dec 1997") }
-    var timeOfBirth by remember { mutableStateOf("04:30 PM") }
+    var name by remember { mutableStateOf("") }
+    var dateOfBirth by remember { mutableStateOf("") }
+    var timeOfBirth by remember { mutableStateOf("") }
     var confidence by remember { mutableStateOf(BirthTimeConfidence.EXACT) }
 
     var placeQuery by remember { mutableStateOf("Chennai, Tamil Nadu, India") }
@@ -273,11 +279,74 @@ private fun Step1Basics(
 
     Spacer(modifier = Modifier.height(14.dp))
 
+    val context = LocalContext.current
+
+    // Date Picker launcher
+    val openDatePicker = {
+        val cal = Calendar.getInstance()
+        try {
+            val df = SimpleDateFormat("dd MMM yyyy", Locale.US)
+            val parsed = df.parse(dob.trim())
+            if (parsed != null) cal.time = parsed
+        } catch (_: Exception) {}
+
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val selectedCal = Calendar.getInstance()
+                selectedCal.set(year, month, dayOfMonth)
+                val formatter = SimpleDateFormat("dd MMM yyyy", Locale.US)
+                onDobChange(formatter.format(selectedCal.time))
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    // Time Picker launcher
+    val openTimePicker = {
+        val cal = Calendar.getInstance()
+        try {
+            val tf = SimpleDateFormat("hh:mm a", Locale.US)
+            val parsed = tf.parse(tob.trim())
+            if (parsed != null) {
+                val tCal = Calendar.getInstance()
+                tCal.time = parsed
+                cal.set(Calendar.HOUR_OF_DAY, tCal.get(Calendar.HOUR_OF_DAY))
+                cal.set(Calendar.MINUTE, tCal.get(Calendar.MINUTE))
+            }
+        } catch (_: Exception) {}
+
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                val selectedCal = Calendar.getInstance()
+                selectedCal.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                selectedCal.set(Calendar.MINUTE, minute)
+                val formatter = SimpleDateFormat("hh:mm a", Locale.US)
+                onTobChange(formatter.format(selectedCal.time))
+            },
+            cal.get(Calendar.HOUR_OF_DAY),
+            cal.get(Calendar.MINUTE),
+            false // 12 hour with AM/PM
+        ).show()
+    }
+
     OutlinedTextField(
         value = dob,
         onValueChange = onDobChange,
-        label = { Text("Date of Birth (DD Mon YYYY)", color = CelestialTextMuted) },
-        leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null, tint = CelestialGold) },
+        label = { Text("Date of Birth (Tap icon for Calendar)", color = CelestialTextMuted) },
+        leadingIcon = {
+            IconButton(onClick = openDatePicker) {
+                Icon(Icons.Default.CalendarToday, contentDescription = "Pick Date", tint = CelestialGold)
+            }
+        },
+        trailingIcon = {
+            TextButton(onClick = openDatePicker) {
+                Text("Pick", color = CelestialGold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+        },
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = CelestialTextPrimary,
             unfocusedTextColor = CelestialTextPrimary,
@@ -295,8 +364,17 @@ private fun Step1Basics(
     OutlinedTextField(
         value = tob,
         onValueChange = onTobChange,
-        label = { Text("Time of Birth (hh:mm AM/PM)", color = CelestialTextMuted) },
-        leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null, tint = CelestialGold) },
+        label = { Text("Time of Birth (Tap icon for Clock)", color = CelestialTextMuted) },
+        leadingIcon = {
+            IconButton(onClick = openTimePicker) {
+                Icon(Icons.Default.Schedule, contentDescription = "Pick Time", tint = CelestialGold)
+            }
+        },
+        trailingIcon = {
+            TextButton(onClick = openTimePicker) {
+                Text("Pick", color = CelestialGold, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+        },
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = CelestialTextPrimary,
             unfocusedTextColor = CelestialTextPrimary,
@@ -308,6 +386,31 @@ private fun Step1Basics(
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth().testTag("profile_tob_input")
     )
+
+    // Quick presets for time
+    Spacer(modifier = Modifier.height(6.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        listOf("06:00 AM" to "Dawn", "12:00 PM" to "Noon", "04:30 PM" to "Evening", "11:30 PM" to "Night").forEach { (timeStr, label) ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (tob == timeStr) CelestialGoldWash else CelestialSurface3)
+                    .border(1.dp, if (tob == timeStr) CelestialGold else CelestialBorder, RoundedCornerShape(8.dp))
+                    .clickable { onTobChange(timeStr) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 11.sp,
+                    color = if (tob == timeStr) CelestialGoldStrong else CelestialTextMuted,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
 
     Spacer(modifier = Modifier.height(20.dp))
 

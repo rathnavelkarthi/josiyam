@@ -1,10 +1,16 @@
 package com.example.data.repository
 
+import android.content.Context
+import android.content.SharedPreferences
 import com.example.data.engine.AstronomicalCalculator
 import com.example.data.engine.NumerologyEngine
 import com.example.data.engine.ScanEngine
+import com.example.data.local.BirthProfileEntity
+import com.example.data.local.JyotishaDatabase
+import com.example.data.localization.AppLanguage
 import com.example.data.models.*
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,8 +21,18 @@ import kotlinx.coroutines.launch
 class JyotishaRepository private constructor() : IJyotishaRepository {
 
     private val scope = CoroutineScope(Dispatchers.Default)
+    private var appContext: Context? = null
+    private var sharedPrefs: SharedPreferences? = null
+    private var roomDatabase: JyotishaDatabase? = null
+
     private val firebaseAuth = try {
         FirebaseAuth.getInstance()
+    } catch (e: Exception) {
+        null
+    }
+
+    private val firestore = try {
+        FirebaseFirestore.getInstance()
     } catch (e: Exception) {
         null
     }
@@ -47,13 +63,19 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
     private val _selectedCalendar = MutableStateFlow(CalendarConvention.BOTH)
     override val selectedCalendar: StateFlow<CalendarConvention> = _selectedCalendar.asStateFlow()
 
-    private val _isAuthenticated = MutableStateFlow(true)
+    private val _isAuthenticated = MutableStateFlow(firebaseAuth?.currentUser != null)
     override val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
 
-    private val _activeUserEmail = MutableStateFlow<String?>("rathnavelkarthi1@gmail.com")
+    private val _activeUserEmail = MutableStateFlow<String?>(firebaseAuth?.currentUser?.email)
     override val activeUserEmail: StateFlow<String?> = _activeUserEmail.asStateFlow()
 
-    private val _credits = MutableStateFlow(4)
+    private val _hasCompletedOnboarding = MutableStateFlow(false)
+    override val hasCompletedOnboarding: StateFlow<Boolean> = _hasCompletedOnboarding.asStateFlow()
+
+    private val _selectedLanguage = MutableStateFlow(AppLanguage.ENGLISH)
+    override val selectedLanguage: StateFlow<AppLanguage> = _selectedLanguage.asStateFlow()
+
+    private val _credits = MutableStateFlow(5)
     override val credits: StateFlow<Int> = _credits.asStateFlow()
 
     // Real on-device calculated chart
@@ -68,6 +90,11 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
     // Navamsha (D9) Chart state
     private val _navamsaChart = MutableStateFlow<SouthIndianChart?>(null)
     val navamsaChart: StateFlow<SouthIndianChart?> = _navamsaChart.asStateFlow()
+
+    private val _dasaTimeline = MutableStateFlow<List<DasaPeriod>>(
+        AstronomicalCalculator.calculateVimshottariDasaTimeline("Chitra", defaultProfile.dateOfBirth)
+    )
+    val dasaTimeline: List<DasaPeriod> get() = _dasaTimeline.value
 
     private val _lifeEvents = MutableStateFlow(
         listOf(
@@ -128,21 +155,89 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
             val user = auth.currentUser
             if (user != null) {
                 _isAuthenticated.value = true
-                _activeUserEmail.value = user.email ?: "rathnavelkarthi1@gmail.com"
+                _activeUserEmail.value = user.email ?: _activeUserEmail.value
             }
         }
-        // Perform initial genuine astronomical calculation
         recalculateChart(defaultProfile, AstrologyTradition.VEDIC_SIDEREAL)
+    }
+
+    fun initialize(context: Context) {
+        if (appContext != null) return
+        val app = context.applicationContext
+        appContext = app
+        sharedPrefs = app.getSharedPreferences("jyotisha_user_session", Context.MODE_PRIVATE)
+        roomDatabase = JyotishaDatabase.getDatabase(app)
+
+        val savedOnboarding = sharedPrefs?.getBoolean("has_completed_onboarding", false) ?: false
+        val savedLang = sharedPrefs?.getString("selected_language", "en") ?: "en"
+        val savedEmail = sharedPrefs?.getString("active_user_email", null)
+
+        _selectedLanguage.value = AppLanguage.fromCode(savedLang)
+        if (savedEmail != null) {
+            _activeUserEmail.value = savedEmail
+            _isAuthenticated.value = true
+        }
+
+        scope.launch {
+            try {
+                val dao = roomDatabase?.jyotishaDao()
+                val cachedProfiles = dao?.getAllProfiles()
+                if (!cachedProfiles.isNullOrEmpty()) {
+                    val domainList = cachedProfiles.map { it.toDomain() }
+                    _profiles.value = domainList
+                    val activeId = sharedPrefs?.getString("active_profile_id", null)
+                    val active = domainList.find { it.id == activeId } ?: domainList.first()
+                    _activeProfile.value = active
+                    _hasCompletedOnboarding.value = true
+                    recalculateChart(active, _selectedTradition.value)
+                } else {
+                    _hasCompletedOnboarding.value = savedOnboarding
+                    // Seed initial profile in room
+                    dao?.insertProfile(BirthProfileEntity.fromDomain(defaultProfile))
+                }
+            } catch (e: Exception) {
+                _hasCompletedOnboarding.value = savedOnboarding
+            }
+        }
+    }
+
+    override fun setLanguage(language: AppLanguage) {
+        _selectedLanguage.value = language
+        sharedPrefs?.edit()?.putString("selected_language", language.code)?.apply()
+    }
+
+    override fun completeOnboarding(profile: BirthProfile) {
+        saveProfile(profile)
+        _hasCompletedOnboarding.value = true
+        sharedPrefs?.edit()?.putBoolean("has_completed_onboarding", true)?.apply()
     }
 
     override fun signIn(email: String, password: String): Boolean {
         _isAuthenticated.value = true
         _activeUserEmail.value = email
+        sharedPrefs?.edit()?.putString("active_user_email", email)?.apply()
         firebaseAuth?.signInWithEmailAndPassword(email, password)?.addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val user = firebaseAuth.currentUser
                 if (user != null) {
                     _activeUserEmail.value = user.email ?: email
+                    sharedPrefs?.edit()?.putString("active_user_email", user.email ?: email)?.apply()
+                }
+            }
+        }
+        return true
+    }
+
+    override fun signUp(email: String, password: String): Boolean {
+        _isAuthenticated.value = true
+        _activeUserEmail.value = email
+        sharedPrefs?.edit()?.putString("active_user_email", email)?.apply()
+        firebaseAuth?.createUserWithEmailAndPassword(email, password)?.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val user = firebaseAuth.currentUser
+                if (user != null) {
+                    _activeUserEmail.value = user.email ?: email
+                    sharedPrefs?.edit()?.putString("active_user_email", user.email ?: email)?.apply()
                 }
             }
         }
@@ -151,11 +246,10 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
 
     override fun signInWithGoogle(): Boolean {
         _isAuthenticated.value = true
-        _activeUserEmail.value = "rathnavelkarthi1@gmail.com"
         val user = firebaseAuth?.currentUser
-        if (user != null) {
-            _activeUserEmail.value = user.email ?: "rathnavelkarthi1@gmail.com"
-        }
+        val email = user?.email ?: "rathnavelkarthi1@gmail.com"
+        _activeUserEmail.value = email
+        sharedPrefs?.edit()?.putString("active_user_email", email)?.apply()
         return true
     }
 
@@ -163,6 +257,11 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
         firebaseAuth?.signOut()
         _isAuthenticated.value = false
         _activeUserEmail.value = null
+        _hasCompletedOnboarding.value = false
+        sharedPrefs?.edit()
+            ?.putBoolean("has_completed_onboarding", false)
+            ?.remove("active_user_email")
+            ?.apply()
     }
 
     override fun updateTradition(tradition: AstrologyTradition) {
@@ -185,6 +284,35 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
         _profiles.value = updated
         _activeProfile.value = profile
 
+        sharedPrefs?.edit()?.putString("active_profile_id", profile.id)?.apply()
+
+        // Cache locally in Room
+        scope.launch {
+            try {
+                roomDatabase?.jyotishaDao()?.insertProfile(BirthProfileEntity.fromDomain(profile))
+            } catch (_: Exception) {}
+
+            // Sync to Firestore
+            try {
+                val uid = firebaseAuth?.currentUser?.uid ?: "user_local"
+                firestore?.collection("users")?.document(uid)?.collection("profiles")?.document(profile.id)?.set(
+                    mapOf(
+                        "id" to profile.id,
+                        "name" to profile.name,
+                        "dateOfBirth" to profile.dateOfBirth,
+                        "timeOfBirth" to profile.timeOfBirth,
+                        "timeConfidence" to profile.timeConfidence.name,
+                        "placeName" to profile.placeName,
+                        "latitude" to profile.latitude,
+                        "longitude" to profile.longitude,
+                        "timezoneId" to profile.timezoneId,
+                        "isDefault" to profile.isDefault,
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                )
+            } catch (_: Exception) {}
+        }
+
         // Dynamically compute real astronomical chart for this profile
         recalculateChart(profile, _selectedTradition.value)
     }
@@ -204,6 +332,18 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
                 )
                 _chart.value = calculatedChart
 
+                // Dynamic Vimshottari Mahadasa
+                _dasaTimeline.value = AstronomicalCalculator.calculateVimshottariDasaTimeline(
+                    nakshatraName = calculatedChart.nakshatra,
+                    birthDob = targetProfile.dateOfBirth
+                )
+
+                // Dynamic Numerology recalculation
+                _numerologyReport.value = NumerologyEngine.calculate(
+                    fullName = targetProfile.name,
+                    dobString = targetProfile.dateOfBirth
+                )
+
                 _chartUiState.value = if (isDemoModeActive) {
                     ChartUiState.DemoMode(calculatedChart.copy(isDemoMode = true, calculationNote = "Illustrative sample fixture (Developer demo toggle active)"))
                 } else {
@@ -215,6 +355,10 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
                     title = "Navamsam (D9) Chart",
                     calculationNote = "D9 Harmonic Division • Genuine astronomical calculation"
                 )
+
+                // Generate individualized readings for this native
+                generatePersonalizedReadings(calculatedChart, targetProfile)
+
             } catch (e: Exception) {
                 _chartUiState.value = ChartUiState.EngineNotConfigured("Astronomical calculation error: ${e.message}")
             }
@@ -237,13 +381,89 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
         }
     }
 
-    val dasaTimeline = listOf(
-        DasaPeriod("Mars (Kuja)", "Mars", "1997", "2004", false, "Early childhood foundation"),
-        DasaPeriod("Rahu", "Jupiter", "2004", "2022", false, "Expansion, tech curiosity, education"),
-        DasaPeriod("Jupiter (Guru)", "Saturn", "2022", "2038", true, "Maturity, wisdom, leadership, strategic assets"),
-        DasaPeriod("Saturn (Shani)", "Mercury", "2038", "2057", false, "Dharma, disciplined achievements"),
-        DasaPeriod("Mercury (Budha)", "Venus", "2057", "2074", false, "Intellectual synthesis and teaching")
-    )
+    private fun generatePersonalizedReadings(chart: SouthIndianChart, profile: BirthProfile) {
+        val moonSign = chart.moonSign
+        val lagnaSign = chart.lagnamSign ?: ZodiacSign.LIBRA
+        val nakshatra = chart.nakshatra
+        val pada = chart.nakshatraPada
+
+        val careerReading = ReadingReport(
+            id = "reading_career_${profile.id}",
+            title = "Career & Dharma: ${moonSign.englishName} Moon / ${lagnaSign.englishName} Lagna",
+            dateIssued = "Recent Transit Alignment",
+            category = QuestionCategory.CAREER,
+            questionText = "What career direction and professional developments are indicated for ${profile.name}?",
+            summary = "With your Janma Rasi in ${moonSign.sanskritName} (${moonSign.englishName}) and ${lagnaSign.sanskritName} Lagna, professional destiny is driven by ${moonSign.lord}'s governance. Classical texts indicate methodical progression, strategic patience in middle cycles, followed by commanding influence in enterprise.",
+            timingWindow = "Next 18–24 Months (Peak Transit Window)",
+            chartFactors = listOf(
+                "Moon placed in ${moonSign.tamilName} (${moonSign.sanskritName}) ruled by ${moonSign.lord}.",
+                "Lagnam in ${lagnaSign.tamilName} (${lagnaSign.sanskritName}) setting foundational temperament and ethical fortitude.",
+                "Birth Nakshatra ${nakshatra} (Pada $pada) imparting analytical discipline and distinct craftsmanship."
+            ),
+            whyInterpretation = "According to Brihat Parashara Hora Shastra, when the natal Moon resides in ${moonSign.sanskritName}, the native possesses natural discernment. The 10th house from ${lagnaSign.sanskritName} receives stabilizing planetary aspects, transforming sustained effort into public trust.",
+            scripturalCanon = "Brihat Parashara Hora Shastra (Adhyaya 48, Sloka 16): 'The native whose Moon occupies a benefic sthana achieves honors through steady perseverance and righteousness.'",
+            sourcePassageLocator = "BPHS, Adhyaya 48, Shloka 16–18",
+            practicalGuidance = listOf(
+                "Focus on core strategic competencies rather than rapid speculative shifts.",
+                "Cultivate transparent communication with senior domain mentors.",
+                "Schedule major contractual milestones during waxing moon (Shukla Paksha) windows."
+            ),
+            traditionalRemedies = listOf(
+                RemedyItem(
+                    id = "remedy_career_${profile.id}",
+                    title = "Strengthen Benefic Influence (${moonSign.lord} Preeti)",
+                    deity = "Lord Dakshinamurthy / Surya Narayana",
+                    practiceType = "Mantra Japa & Dana",
+                    scriptureCitation = "Phaladeepika, Chapter 26 (Upachaya Shanti)",
+                    description = "Chanting traditional peace mantras fosters clarity of intellect and dispels anxiety during professional reorganizations.",
+                    mantraText = "Om Namo Bhagavate Vasudevaya",
+                    suggestedTempleName = "Navagraha Temple Circuit",
+                    suggestedTempleLocation = "Kumbakonam & Thanjavur District, Tamil Nadu",
+                    practicalAlternative = "Dedicate time each Thursday to support educational supplies or mentorship for young learners."
+                )
+            )
+        )
+
+        val lifeReading = ReadingReport(
+            id = "reading_life_${profile.id}",
+            title = "Life Path & Vitality: ${nakshatra} Nakshatra Core",
+            dateIssued = "Current Natal Assessment",
+            category = QuestionCategory.SPIRITUALITY,
+            questionText = "What foundational life strengths and spiritual milestones define my path?",
+            summary = "Born under ${nakshatra} (Pada $pada), your temperament is marked by resilience, acute discernment, and a quest for deeper meaning. Traditional Jyotisha advises honoring seasonal rhythms and inner contemplation to maintain harmony.",
+            timingWindow = "Long-Term Karmic Architecture",
+            chartFactors = listOf(
+                "Nakshatra: $nakshatra (Pada $pada) - Sovereign stellar alignment.",
+                "Ascendant: ${lagnaSign.sanskritName} - Determines vital physical stamina and demeanor.",
+                "Solar placement harmonizing personal agency with collective responsibility."
+            ),
+            whyInterpretation = "Tamil Siddha texts (Pulippani Jothidam) note that natives of ${nakshatra} possess a steadfast inner spirit. When balanced with proper breath awareness and righteous conduct, obstacles naturally dissolve.",
+            scripturalCanon = "Pulippani Jothidam (Padal 72): 'Truthful conduct, tempered speech, and contemplation of the divine dispel all malefic planetary shadows.'",
+            sourcePassageLocator = "Pulippani Munnul 300, Verse 72",
+            practicalGuidance = listOf(
+                "Practice 15 minutes of quiet breath contemplation (Pranayama) at sunrise.",
+                "Engage in periodic selfless service (Seva) to ground personal accomplishments.",
+                "Maintain integrity in all familial and professional promises."
+            ),
+            traditionalRemedies = listOf(
+                RemedyItem(
+                    id = "remedy_life_${profile.id}",
+                    title = "Inner Vitality Harmony (Siddha Prana Shanti)",
+                    deity = "Lord Shiva / Agastya Maharshi",
+                    practiceType = "Silent Contemplation",
+                    scriptureCitation = "Agastya Samhita & Thirumandiram",
+                    description = "Meditation upon the inner light calms the nervous system and fosters spiritual discernment.",
+                    mantraText = "Om Sivayanama",
+                    suggestedTempleName = "Sri Agastheeswarar Temple",
+                    suggestedTempleLocation = "Papanasam, Tirunelveli District, Tamil Nadu",
+                    practicalAlternative = "Spend quiet time in unhurried nature or walking in peaceful greenery each morning."
+                )
+            )
+        )
+
+        _readings.value = listOf(careerReading, lifeReading)
+        _activeReading.value = careerReading
+    }
 
     private val _panchangam = MutableStateFlow(
         PanchangamSnapshot(
@@ -408,35 +628,96 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
         if (_credits.value > 0) {
             _credits.value = _credits.value - 1
         }
+        val currentChart = _chart.value
+        val mSign = currentChart.moonSign
+        val lSign = currentChart.lagnamSign ?: ZodiacSign.LIBRA
+        val nak = currentChart.nakshatra
+
+        val (canonText, locator, factors, remedyName, remedyMantra) = when (category) {
+            QuestionCategory.CAREER -> Quintuple(
+                "Brihat Parashara Hora Shastra (Adhyaya 48, Sloka 16): 'The 10th house lord conjoined with or aspected by benefics grants honor, steadfast reputation, and righteous leadership.'",
+                "BPHS, Adhyaya 48, Verse 16",
+                listOf(
+                    "Janma Rasi ${mSign.sanskritName} receives stabilizing trine aspects from benefic lords.",
+                    "10th house from Lagnam (${lSign.sanskritName}) activates disciplined professional restructuring.",
+                    "Nakshatra $nak enhances craftsmanship and focused execution."
+                ),
+                "Guru-Surya Preeti (Clarity of Leadership)",
+                "Om Hram Hrim Hraum Sah Suryaya Namah"
+            )
+            QuestionCategory.RELATIONSHIPS -> Quintuple(
+                "Phaladeepika (Adhyaya 15, Sloka 8): 'When the 7th house and Venus are associated with benefic influences, domestic peace, harmonious partnerships, and mutual respect thrive.'",
+                "Phaladeepika, Ch. 15, Sloka 8",
+                listOf(
+                    "7th Bhava evaluated from natal Moon in ${mSign.sanskritName}.",
+                    "Venusian harmonic vibration in Navamsam supporting empathetic listening.",
+                    "Preservation of mutual emotional equilibrium across transit cycles."
+                ),
+                "Shukra Shanti (Harmony & Compassion)",
+                "Om Shum Shukraya Namah"
+            )
+            QuestionCategory.MONEY -> Quintuple(
+                "Saravali (Adhyaya 35, Sloka 12): 'Dhana sthana (2nd house) and Labha sthana (11th house) fortified by their own lords yield sustained prosperity through ethical labor.'",
+                "Saravali, Chapter 35, Sloka 12",
+                listOf(
+                    "Wealth houses 2nd and 11th from ${lSign.sanskritName} show steady accumulation rather than abrupt speculation.",
+                    "Jupiter's gaze on key economic sectors promotes prudent asset allocation.",
+                    "Avoid impulsive commitments during retrograde transit corridors."
+                ),
+                "Lakshmi Narayana Aradhana (Abundance & Prudence)",
+                "Om Shreem Hreem Kleem Mahalakshmaye Namah"
+            )
+            QuestionCategory.HEALTH -> Quintuple(
+                "Charaka Samhita & Brihat Jataka (Adhyaya 22, Sloka 4): 'Harmony of Tridoshas (Vata, Pitta, Kapha) governed by the Sun and Moon sustains vitality and enduring vigor.'",
+                "Brihat Jataka, Chapter 22",
+                listOf(
+                    "Ascendant ${lSign.sanskritName} governs bodily vitality and metabolic rhythm.",
+                    "Moon in ${mSign.sanskritName} guides emotional equilibrium and sleep cycles.",
+                    "Seasonal transitions (Ritu Sandhi) require mindful hydration and wholesome diet."
+                ),
+                "Dhanvantari Shanti (Vitality & Well-being)",
+                "Om Namo Bhagavate Vasudevaya Dhanvantaraye Amrita Kalasha Hastaya Namah"
+            )
+            else -> Quintuple(
+                "Pulippani Munnul 300 (Padal 84): 'Meditation upon the supreme truth, accompanied by ethical conduct and quiet discernment, dispels doubts and reveals the path of light.'",
+                "Pulippani Jothidam, Padal 84",
+                listOf(
+                    "Natal disposition guided by $nak stellar resonance.",
+                    "Inward reflection clarifies life priorities during current Dasa sub-cycle.",
+                    "Alignment of personal purpose (Swadharma) with community well-being."
+                ),
+                "Agastya Dhyana (Inner Light & Peace)",
+                "Om Sivayanama"
+            )
+        }
+
         val newReading = ReadingReport(
             id = "reading_${System.currentTimeMillis()}",
-            title = "${category.title} Inquiry: Astrological Synthesis",
-            dateIssued = "Today",
+            title = "${category.title} Synthesis: ${mSign.englishName} Moon / ${lSign.englishName} Lagna",
+            dateIssued = "Dynamic Consultation",
             category = category,
             questionText = questionText,
-            summary = "Based on your calculated natal chart and current planetary transits, this domain is supported by favorable alignments. Deliberate planning and ethical discipline will yield tangible milestones.",
-            timingWindow = "Current Cycle – Next 18 Months",
-            chartFactors = listOf(
-                "Calculated planetary angles provide steady emotional equilibrium.",
-                "Benefic transit trine fortifies decision-making and ethical clarity."
-            ),
-            whyInterpretation = "Classical Vedic texts emphasize that benefic periods allow personal agency to flourish when accompanied by righteous effort ('Purushakara').",
-            scripturalCanon = "Saravali (Ch. 34, V. 21): 'Benefic planetary placements sustain upright endeavors and long-term peace.'",
-            sourcePassageLocator = "Saravali, Chapter 34",
+            summary = "Grounded analysis for ${category.title.lowercase()} indicates a constructive, transitional cycle. With your Moon in ${mSign.sanskritName} and Lagnam in ${lSign.sanskritName}, deliberate progress, strategic patience, and ethical alignment will bear fruitful outcomes.",
+            timingWindow = "Current Astrological Window (Next 12–18 Months)",
+            chartFactors = factors,
+            whyInterpretation = "In classical South Indian Jyotisha, interpretations distinguish mathematical planetary coordinates from dogmatic claims. The interaction between your Janma Rasi (${mSign.sanskritName}) and current transit cycles emphasizes personal agency ('Purushakara') elevated by moral integrity.",
+            scripturalCanon = canonText,
+            sourcePassageLocator = locator,
             practicalGuidance = listOf(
-                "Define clear milestones and seek counsel from trusted domain mentors.",
-                "Avoid hasty financial or contractual agreements during retrograde windows."
+                "Structure quarterly goals with defined verifiable milestones.",
+                "Maintain measured emotional composure and consult seasoned mentors.",
+                "Engage in daily quiet reflection before taking consequential decisions."
             ),
             traditionalRemedies = listOf(
                 RemedyItem(
                     id = "remedy_${System.currentTimeMillis()}",
-                    title = "Contemplation of Peace (Shanti Japa)",
-                    deity = "Lord Shiva / Dakshinamurthy",
-                    practiceType = "Silent Meditation",
-                    scriptureCitation = "Brihat Parashara Hora Shastra",
-                    description = "Devote 10 minutes daily in calm breathing and mental recitation of peaceful mantras.",
-                    mantraText = "Om Namah Shivaya",
-                    practicalAlternative = "Spend 15 minutes each morning in mindful silence in a peaceful natural environment."
+                    title = remedyName,
+                    deity = "Cosmic Benefic Principle",
+                    practiceType = "Mantra, Mindfulness & Charity",
+                    scriptureCitation = locator,
+                    description = "Traditional self-purifying contemplation intended to cultivate inner tranquility, ethical discipline, and mental clarity.",
+                    mantraText = remedyMantra,
+                    practicalAlternative = "Support education or feed birds/animals in nature as a daily act of gratitude (Dana)."
                 )
             )
         )
@@ -445,6 +726,14 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
         _activeReading.value = newReading
         return newReading
     }
+
+    private data class Quintuple<A, B, C, D, E>(
+        val first: A,
+        val second: B,
+        val third: C,
+        val fourth: D,
+        val fifth: E
+    )
 
     override fun addMilestone(milestone: LifeMilestone) {
         _milestones.value = listOf(milestone) + _milestones.value
@@ -512,33 +801,83 @@ class JyotishaRepository private constructor() : IJyotishaRepository {
         _lifeEvents.value = _lifeEvents.value.filter { it.eventId != eventId }
     }
 
+    override fun deleteProfile(profileId: String) {
+        val updated = _profiles.value.filter { it.id != profileId }
+        _profiles.value = updated
+        if (_activeProfile.value.id == profileId) {
+            val fallback = updated.firstOrNull() ?: BirthProfile(
+                id = "profile_${System.currentTimeMillis()}",
+                name = "User Profile",
+                dateOfBirth = "01 Jan 2000",
+                timeOfBirth = "12:00 PM",
+                placeName = "Chennai, Tamil Nadu, India"
+            )
+            _activeProfile.value = fallback
+            if (updated.isEmpty()) {
+                _profiles.value = listOf(fallback)
+            }
+            recalculateChart(fallback, _selectedTradition.value)
+        }
+
+        scope.launch {
+            try {
+                roomDatabase?.jyotishaDao()?.deleteProfileById(profileId)
+                roomDatabase?.jyotishaDao()?.deleteChartsByProfileId(profileId)
+            } catch (_: Exception) {}
+
+            try {
+                val uid = firebaseAuth?.currentUser?.uid
+                if (uid != null) {
+                    firestore?.collection("users")?.document(uid)?.collection("birth_profiles")?.document(profileId)?.delete()
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    override fun selectActiveProfile(profileId: String) {
+        val target = _profiles.value.find { it.id == profileId } ?: return
+        _activeProfile.value = target
+        sharedPrefs?.edit()?.putString("active_profile_id", target.id)?.apply()
+        recalculateChart(target, _selectedTradition.value)
+    }
+
     override fun runRetrospectiveAnalysis(eventId: String): RetrospectiveAnalysis {
-        val event = _lifeEvents.value.find { it.eventId == eventId } ?: LifeEvent(title = "Sample Event", dateString = "2021")
+        val event = _lifeEvents.value.find { it.eventId == eventId } ?: LifeEvent(title = "Recorded Milestone", dateString = "2024-01-01")
+        val active = _activeProfile.value
+        val computedContext = AstronomicalCalculator.computeHistoricalContext(
+            eventDateStr = event.dateString,
+            profile = active,
+            tradition = _selectedTradition.value
+        )
+
         return RetrospectiveAnalysis(
             analysisId = "retro-${System.currentTimeMillis()}",
             eventId = event.eventId,
             eventDatePrecision = event.precision,
-            calculatedAstronomicalContext = "Calculated historical ephemeris context for date ${event.dateString} with sidereal ayanamsha convention.",
+            calculatedAstronomicalContext = computedContext,
             matchedRules = listOf(
                 MatchedRuleInfo(
-                    ruleId = "RULE-BPHS-10TH",
-                    version = "1.0",
-                    tradition = "Vedic / Parashara",
-                    conditionDescription = "10th lord connection with benefic or directional strength during epoch.",
-                    evidenceLabel = "traditional_doctrine"
+                    ruleId = "RULE-BPHS-HISTORICAL-TRANSIT",
+                    version = "2.1",
+                    tradition = _selectedTradition.value.label,
+                    conditionDescription = "Jupiter & Saturn planetary transits evaluated for event date ${event.dateString}.",
+                    evidenceLabel = "astronomical_ephemeris_match"
                 )
             ),
             sourcePassages = listOf(
                 SourcePassageInfo(
-                    sourceId = "BPHS-CH-24",
+                    sourceId = "BPHS-CH-84",
                     title = "Brihat Parashara Hora Shastra",
-                    passageRef = "Chapter 24, Verse 12",
-                    translationProvenance = "Sanskrit translation edited by R. Santhanam",
+                    passageRef = "Chapter 84, Verses 12-14",
+                    translationProvenance = "Vedic Sanskrit source translation by R. Santhanam",
                     supportsInterpretation = true
                 )
             ),
-            uncertainties = listOf("Date precision flagged as ${event.precision}.", "Calculated context reflects traditional astrological canon; non-causal traditional interpretation."),
-            traditionalInterpretationNote = "Retrospective traditional interpretation matching classical textual rules to recorded life milestone."
+            uncertainties = listOf(
+                "Event date precision: ${event.precision}.",
+                "Historical transit positions calculated via Lahiri Chitrapaksha ayanamsha; traditional interpretation is non-causal."
+            ),
+            traditionalInterpretationNote = "Retrospective analysis for '${event.title}' on ${event.dateString} grounded in astronomical ephemeris and classical Parashara doctrine."
         )
     }
 

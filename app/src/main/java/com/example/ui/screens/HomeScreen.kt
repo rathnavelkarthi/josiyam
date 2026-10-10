@@ -85,14 +85,15 @@ fun HomeScreen(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
+                        val currentLang = com.example.data.localization.LocalAppLanguage.current
                         Text(
-                            text = "Vanakkam, ${profile.name} 👋",
+                            text = com.example.data.localization.JyotishaStrings.getGreeting(currentLang, profile.name),
                             fontSize = 17.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = CelestialTextPrimary
                         )
                         Text(
-                            text = "Your cosmic blueprint is ready",
+                            text = com.example.data.localization.JyotishaStrings.getSubtitle(currentLang),
                             fontSize = 12.sp,
                             color = CelestialTextMuted
                         )

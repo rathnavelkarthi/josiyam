@@ -31,7 +31,7 @@ fun SouthIndianChartView(
     onSignSelected: (ZodiacSign) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 4x4 South Indian Kattam Grid
+    // Authentic 4x4 South Indian Kattam Grid with fixed clockwise sign positions
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -39,50 +39,47 @@ fun SouthIndianChartView(
             .clip(RoundedCornerShape(18.dp))
             .background(CelestialSurface2)
             .border(1.5.dp, CelestialBorderStrong, RoundedCornerShape(18.dp))
-            .padding(4.dp)
+            .padding(6.dp)
             .testTag("south_indian_chart")
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            for (row in 0..3) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    for (col in 0..3) {
-                        val isCenter = (row == 1 || row == 2) && (col == 1 || col == 2)
-                        if (isCenter) {
-                            // The 2x2 center is rendered on row 1, col 1 spanning to col 2 and row 2
-                            if (row == 1 && col == 1) {
-                                ChartCenterHub(
-                                    chart = chart,
-                                    modifier = Modifier
-                                        .weight(2f)
-                                        .fillMaxHeight()
-                                )
-                            }
-                            // col 2 in row 1 or col 1 & 2 in row 2 are handled by weight
-                        } else {
-                            val sign = ZodiacSign.at(row, col)
-                            if (sign != null) {
-                                val isSelected = selectedSign == sign
-                                val planetsInSign = chart.placements.filter { it.sign == sign }
-                                val isLagnaHouse = chart.lagnamSign == sign
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val cellW = maxWidth / 4f
+            val cellH = maxHeight / 4f
 
-                                ChartSignCell(
-                                    sign = sign,
-                                    planets = planetsInSign,
-                                    isLagnaHouse = isLagnaHouse,
-                                    isSelected = isSelected,
-                                    onClick = { onSignSelected(sign) },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight()
-                                )
-                            }
-                        }
-                    }
+            // Render 12 Zodiac Sign cells
+            ZodiacSign.entries.forEach { sign ->
+                val isSelected = selectedSign == sign
+                val planetsInSign = chart.placements.filter { it.sign == sign }
+                val isLagnaHouse = chart.lagnamSign == sign
+
+                Box(
+                    modifier = Modifier
+                        .offset(x = cellW * sign.gridCol, y = cellH * sign.gridRow)
+                        .size(cellW, cellH)
+                        .padding(2.dp)
+                ) {
+                    ChartSignCell(
+                        sign = sign,
+                        planets = planetsInSign,
+                        isLagnaHouse = isLagnaHouse,
+                        isSelected = isSelected,
+                        onClick = { onSignSelected(sign) },
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
+            }
+
+            // Render central 2x2 Hub (occupies columns 1..2 and rows 1..2)
+            Box(
+                modifier = Modifier
+                    .offset(x = cellW, y = cellH)
+                    .size(cellW * 2f, cellH * 2f)
+                    .padding(2.dp)
+            ) {
+                ChartCenterHub(
+                    chart = chart,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }

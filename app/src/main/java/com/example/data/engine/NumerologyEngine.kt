@@ -49,15 +49,44 @@ object NumerologyEngine {
         if (pythSum == 0) pythSum = 16
         var pythSingle = reduceNumber(pythSum)
 
-        // 3. Birth Number (Day of birth)
-        val dayDigitsOnly = dobString.filter { it.isDigit() }
-        val birthDay = if (dayDigitsOnly.length >= 2) {
-            dayDigitsOnly.take(2).toIntOrNull() ?: 15
-        } else 15
+        // 3. Birth Number (Day of birth) & 4. Life Path Number
+        var birthDay = 24
+        var birthMonth = 12
+        var birthYear = 1997
+
+        val dateFormats = listOf("dd MMM yyyy", "yyyy-MM-dd", "dd/MM/yyyy", "dd-MM-yyyy", "MMM dd, yyyy", "yyyy/MM/dd")
+        var dateParsed = false
+        val cal = java.util.Calendar.getInstance()
+        for (pattern in dateFormats) {
+            try {
+                val df = java.text.SimpleDateFormat(pattern, java.util.Locale.US)
+                df.isLenient = false
+                val parsed = df.parse(dobString.trim())
+                if (parsed != null) {
+                    cal.time = parsed
+                    birthDay = cal.get(java.util.Calendar.DAY_OF_MONTH)
+                    birthMonth = cal.get(java.util.Calendar.MONTH) + 1
+                    birthYear = cal.get(java.util.Calendar.YEAR)
+                    dateParsed = true
+                    break
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (!dateParsed) {
+            // Fallback parsing from digits
+            val parts = dobString.trim().split(" ", "-", "/", ".")
+            if (parts.size >= 3) {
+                birthDay = parts[0].toIntOrNull() ?: 15
+                birthYear = parts.find { it.length == 4 }?.toIntOrNull() ?: 1997
+            }
+        }
+
         val birthNumber = reduceToSingle(birthDay)
 
-        // 4. Life Path Number (Full DOB sum)
-        val fullDobSum = dayDigitsOnly.sumOf { it.digitToIntOrNull() ?: 0 }
+        // Life Path Number (Sum of all digits of day + month + year)
+        val fullDigits = "$birthDay$birthMonth$birthYear"
+        val fullDobSum = fullDigits.sumOf { it.digitToIntOrNull() ?: 0 }
         val lifePathNumber = if (fullDobSum == 11 || fullDobSum == 22 || fullDobSum == 33) {
             fullDobSum
         } else {

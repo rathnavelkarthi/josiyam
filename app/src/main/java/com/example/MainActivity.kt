@@ -53,6 +53,10 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             // App Check initialization fallback for offline or test mode
         }
+        
+        // Initialize persistent repository session with Application context
+        JyotishaRepository.getInstance().initialize(this)
+
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -84,6 +88,9 @@ fun JyotishaApp() {
     val lifeEvents by repository.lifeEvents.collectAsStateWithLifecycle()
     val predictions by repository.predictions.collectAsStateWithLifecycle()
     val evaluationSummary by repository.evaluationSummary.collectAsStateWithLifecycle()
+    val hasCompletedOnboarding by repository.hasCompletedOnboarding.collectAsStateWithLifecycle()
+    val selectedLanguage by repository.selectedLanguage.collectAsStateWithLifecycle()
+    val activeUserEmail by repository.activeUserEmail.collectAsStateWithLifecycle()
 
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Splash) }
     var currentMainDestination by remember { mutableStateOf(AppDestination.HOME) }
@@ -108,71 +115,85 @@ fun JyotishaApp() {
     // Determine whether to show Bottom Navigation Bar
     val isBottomBarVisible = currentScreen is Screen.Main
 
-    Scaffold(
-        containerColor = CelestialBg,
-        bottomBar = {
-            if (isBottomBarVisible) {
-                JyotishaBottomNavBar(
-                    currentDestination = currentMainDestination,
-                    onNavigate = { dest ->
-                        currentMainDestination = dest
-                        currentScreen = Screen.Main(dest)
+    CompositionLocalProvider(com.example.data.localization.LocalAppLanguage provides selectedLanguage) {
+        Scaffold(
+            containerColor = CelestialBg,
+            bottomBar = {
+                if (isBottomBarVisible) {
+                    JyotishaBottomNavBar(
+                        currentDestination = currentMainDestination,
+                        onNavigate = { dest ->
+                            currentMainDestination = dest
+                            currentScreen = Screen.Main(dest)
+                        }
+                    )
+                }
+            },
+            contentWindowInsets = WindowInsets.systemBars
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                when (val screen = currentScreen) {
+                    is Screen.Splash -> {
+                        SplashScreen(
+                            hasCompletedOnboarding = hasCompletedOnboarding,
+                            onContinue = {
+                                currentScreen = if (hasCompletedOnboarding) {
+                                    Screen.Main(AppDestination.HOME)
+                                } else {
+                                    Screen.Welcome
+                                }
+                            }
+                        )
                     }
-                )
-            }
-        },
-        contentWindowInsets = WindowInsets.systemBars
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            when (val screen = currentScreen) {
-                is Screen.Splash -> {
-                    SplashScreen(
-                        onContinue = { currentScreen = Screen.Welcome }
-                    )
-                }
 
-                is Screen.Welcome -> {
-                    WelcomeScreen(
-                        onBeginJourney = { currentScreen = Screen.TraditionSelect },
-                        onAlreadyHaveAccount = { currentScreen = Screen.Auth }
-                    )
-                }
+                    is Screen.Welcome -> {
+                        WelcomeScreen(
+                            onBeginJourney = { currentScreen = Screen.TraditionSelect },
+                            onAlreadyHaveAccount = { currentScreen = Screen.Auth }
+                        )
+                    }
 
-                is Screen.TraditionSelect -> {
-                    TraditionSelectionScreen(
-                        currentTradition = tradition,
-                        currentCalendar = calendar,
-                        onTraditionSelected = { repository.updateTradition(it) },
-                        onCalendarSelected = { repository.updateCalendar(it) },
-                        onContinue = { currentScreen = Screen.Auth },
-                        onBack = { currentScreen = Screen.Welcome }
-                    )
-                }
+                    is Screen.TraditionSelect -> {
+                        TraditionSelectionScreen(
+                            currentTradition = tradition,
+                            currentCalendar = calendar,
+                            onTraditionSelected = { repository.updateTradition(it) },
+                            onCalendarSelected = { repository.updateCalendar(it) },
+                            onContinue = { currentScreen = Screen.Auth },
+                            onBack = { currentScreen = Screen.Welcome }
+                        )
+                    }
 
-                is Screen.Auth -> {
-                    AuthScreen(
-                        onAuthSuccess = {
-                            // Route to birth profile setup if first time, or directly to Dashboard
-                            currentScreen = Screen.BirthProfileStepper
-                        },
-                        onBack = { currentScreen = Screen.TraditionSelect }
-                    )
-                }
+                    is Screen.Auth -> {
+                        AuthScreen(
+                            onSignIn = { email, pass -> repository.signIn(email, pass) },
+                            onSignUp = { email, pass -> repository.signUp(email, pass) },
+                            onGoogleSignIn = { repository.signInWithGoogle() },
+                            onAuthSuccess = {
+                                currentScreen = if (hasCompletedOnboarding) {
+                                    Screen.Main(AppDestination.HOME)
+                                } else {
+                                    Screen.BirthProfileStepper
+                                }
+                            },
+                            onBack = { currentScreen = Screen.TraditionSelect }
+                        )
+                    }
 
-                is Screen.BirthProfileStepper -> {
-                    BirthProfileStepperScreen(
-                        onProfileSaved = { newProfile ->
-                            repository.saveProfile(newProfile)
-                            currentMainDestination = AppDestination.HOME
-                            currentScreen = Screen.Main(AppDestination.HOME)
-                        },
-                        onBack = { currentScreen = Screen.Auth }
-                    )
-                }
+                    is Screen.BirthProfileStepper -> {
+                        BirthProfileStepperScreen(
+                            onProfileSaved = { newProfile ->
+                                repository.completeOnboarding(newProfile)
+                                currentMainDestination = AppDestination.HOME
+                                currentScreen = Screen.Main(AppDestination.HOME)
+                            },
+                            onBack = { currentScreen = Screen.Auth }
+                        )
+                    }
 
                 is Screen.Main -> {
                     when (screen.destination) {
@@ -255,12 +276,20 @@ fun JyotishaApp() {
                                 tradition = tradition,
                                 calendar = calendar,
                                 credits = credits,
+                                userEmail = activeUserEmail,
+                                currentLanguage = selectedLanguage,
+                                onChangeLanguage = { repository.setLanguage(it) },
+                                onSelectProfile = { repository.selectActiveProfile(it.id) },
                                 onEditProfile = { currentScreen = Screen.BirthProfileStepper },
                                 onAddProfile = { currentScreen = Screen.BirthProfileStepper },
+                                onDeleteProfile = { repository.deleteProfile(it) },
                                 onChangeTradition = { currentScreen = Screen.TraditionSelect },
                                 onRechargeCredits = {
-                                    // Demo credit recharge
                                     repeat(5) { repository.saveProfile(activeProfile) }
+                                },
+                                onSignOut = {
+                                    repository.signOut()
+                                    currentScreen = Screen.Auth
                                 }
                             )
                         }
@@ -372,13 +401,15 @@ fun JyotishaApp() {
                     )
                 }
 
-                is Screen.EvaluationSummaryRoute -> {
-                    EvaluationSummaryScreen(
-                        summary = evaluationSummary,
-                        onBack = { currentScreen = Screen.LifeTimeline }
-                    )
+                    is Screen.EvaluationSummaryRoute -> {
+                        EvaluationSummaryScreen(
+                            summary = evaluationSummary,
+                            onBack = { currentScreen = Screen.LifeTimeline }
+                        )
+                    }
                 }
             }
         }
     }
 }
+

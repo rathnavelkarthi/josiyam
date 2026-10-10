@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,9 +32,18 @@ import com.example.ui.theme.*
 
 @Composable
 fun SplashScreen(
+    hasCompletedOnboarding: Boolean = false,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Auto-transition to dashboard if session was already established and onboarding completed
+    LaunchedEffect(hasCompletedOnboarding) {
+        if (hasCompletedOnboarding) {
+            kotlinx.coroutines.delay(1400)
+            onContinue()
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "halo_breathing")
     val haloScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -139,7 +149,7 @@ fun SplashScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 CelestialButton(
-                    text = "Begin Experience",
+                    text = if (hasCompletedOnboarding) "Enter Cosmic Dashboard →" else "Begin Experience",
                     onClick = onContinue,
                     testTag = "splash_continue_button"
                 )

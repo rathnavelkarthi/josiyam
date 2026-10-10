@@ -192,39 +192,80 @@ object AstronomicalCalculator {
     private fun computeJulianDayAndCenturies(profile: BirthProfile): Pair<Double, Double> {
         val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
         
-        // Parse "24 Dec 1997" format
-        try {
-            val df = SimpleDateFormat("dd MMM yyyy", Locale.US)
-            val parsedDate = df.parse(profile.dateOfBirth)
-            if (parsedDate != null) {
-                cal.time = parsedDate
-            }
-        } catch (_: Exception) {}
-
-        var hour = 12
-        var min = 0
-        if (profile.timeConfidence != BirthTimeConfidence.UNKNOWN && profile.timeOfBirth.isNotBlank()) {
+        // Multi-format date parsing to handle diverse picker and manual formats
+        val dateFormats = listOf(
+            "dd MMM yyyy",
+            "yyyy-MM-dd",
+            "dd/MM/yyyy",
+            "dd-MM-yyyy",
+            "MMM dd, yyyy",
+            "yyyy/MM/dd",
+            "dd.MM.yyyy",
+            "d MMM yyyy"
+        )
+        
+        var dateParsed = false
+        val cleanDob = profile.dateOfBirth.trim()
+        for (pattern in dateFormats) {
             try {
-                val tf = SimpleDateFormat("hh:mm a", Locale.US)
-                val parsedTime = tf.parse(profile.timeOfBirth)
-                if (parsedTime != null) {
-                    val tCal = Calendar.getInstance()
-                    tCal.time = parsedTime
-                    hour = tCal.get(Calendar.HOUR_OF_DAY)
-                    min = tCal.get(Calendar.MINUTE)
+                val df = SimpleDateFormat(pattern, Locale.US)
+                df.isLenient = false
+                val parsed = df.parse(cleanDob)
+                if (parsed != null) {
+                    cal.time = parsed
+                    dateParsed = true
+                    break
                 }
             } catch (_: Exception) {}
         }
 
+        // If standard formats fail, try parsing with English month names regardless of device locale
+        if (!dateParsed) {
+            try {
+                val parts = cleanDob.split(" ", "-", "/", ".")
+                if (parts.size >= 3) {
+                    val y = parts.find { it.length == 4 }?.toIntOrNull() ?: 1997
+                    cal.set(Calendar.YEAR, y)
+                }
+            } catch (_: Exception) {}
+        }
+
+        var hour = 12
+        var min = 0
+        if (profile.timeConfidence != BirthTimeConfidence.UNKNOWN && profile.timeOfBirth.isNotBlank()) {
+            val cleanTob = profile.timeOfBirth.trim()
+            val timeFormats = listOf(
+                "hh:mm a",
+                "h:mm a",
+                "HH:mm",
+                "H:mm",
+                "hh:mm:ss a",
+                "HH:mm:ss"
+            )
+            for (tPattern in timeFormats) {
+                try {
+                    val tf = SimpleDateFormat(tPattern, Locale.US)
+                    tf.isLenient = false
+                    val parsedTime = tf.parse(cleanTob)
+                    if (parsedTime != null) {
+                        val tCal = Calendar.getInstance()
+                        tCal.time = parsedTime
+                        hour = tCal.get(Calendar.HOUR_OF_DAY)
+                        min = tCal.get(Calendar.MINUTE)
+                        break
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
         // Apply timezone offset adjustment
-        val tzOffsetHours = if (profile.timezoneId.contains("GMT+05:30") || profile.timezoneId.contains("Kolkata")) {
-            5.5
-        } else if (profile.timezoneId.contains("GMT+08:00") || profile.timezoneId.contains("Singapore")) {
-            8.0
-        } else if (profile.timezoneId.contains("GMT-05:00") || profile.timezoneId.contains("New_York")) {
-            -5.0
-        } else {
-            0.0
+        val tzOffsetHours = when {
+            profile.timezoneId.contains("GMT+05:30") || profile.timezoneId.contains("Kolkata") -> 5.5
+            profile.timezoneId.contains("GMT+08:00") || profile.timezoneId.contains("Singapore") -> 8.0
+            profile.timezoneId.contains("GMT-05:00") || profile.timezoneId.contains("New_York") -> -5.0
+            profile.timezoneId.contains("GMT+00:00") || profile.timezoneId.contains("London") -> 0.0
+            profile.timezoneId.contains("GMT-08:00") || profile.timezoneId.contains("Los_Angeles") -> -8.0
+            else -> 5.5 // Default to IST for South Indian Jyotisha context
         }
 
         val utcDecimalHour = (hour + min / 60.0) - tzOffsetHours
@@ -245,6 +286,75 @@ object AstronomicalCalculator {
 
         val t = (jd - 2451545.0) / 36525.0
         return Pair(jd, t)
+    }
+
+    /**
+     * Dynamically calculates authentic Vimshottari Mahadasa cycles for the native
+     * based on their birth nakshatra and birth year.
+     */
+    fun calculateVimshottariDasaTimeline(nakshatraName: String, birthDob: String): List<DasaPeriod> {
+        // Vimshottari sequence of 9 lords and durations in years
+        val dasaSequence = listOf(
+            Triple("Ketu", "Ketu (Gnana Karaka)", 7),
+            Triple("Venus", "Venus (Shukra)", 20),
+            Triple("Sun", "Sun (Surya)", 6),
+            Triple("Moon", "Moon (Chandra)", 10),
+            Triple("Mars", "Mars (Kuja / Mangala)", 7),
+            Triple("Rahu", "Rahu (Chaya Graha)", 18),
+            Triple("Jupiter", "Jupiter (Brihaspati / Guru)", 16),
+            Triple("Saturn", "Saturn (Shani)", 19),
+            Triple("Mercury", "Mercury (Budha)", 17)
+        )
+
+        val nakshatraIndex = NAKSHATRAS.indexOfFirst { it.equals(nakshatraName, ignoreCase = true) }.let {
+            if (it >= 0) it else 13 // default Chitra if not found
+        }
+        val startingDasaIndex = nakshatraIndex % 9
+
+        var birthYear = 1997
+        try {
+            val parts = birthDob.trim().split(" ", "-", "/", ".")
+            parts.find { it.length == 4 }?.toIntOrNull()?.let { birthYear = it }
+        } catch (_: Exception) {}
+
+        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+        val result = mutableListOf<DasaPeriod>()
+        var runningYear = birthYear
+
+        for (i in 0 until 6) {
+            val idx = (startingDasaIndex + i) % 9
+            val (lordKey, displayName, duration) = dasaSequence[idx]
+            val endYear = runningYear + duration
+            val isCurrent = currentYear in runningYear until endYear
+            val subLord = dasaSequence[(idx + 1) % 9].first
+
+            val description = when (lordKey) {
+                "Ketu" -> "Spiritual turning point, detachment, inward contemplation & esoteric learning."
+                "Venus" -> "Artistic blossom, harmonious alliances, material comforts, vehicles & aesthetic pursuits."
+                "Sun" -> "Authority, self-assertion, recognition from elders, vitality & administrative focus."
+                "Moon" -> "Nurturing relationships, emotional expansion, public reputation & creative rhythm."
+                "Mars" -> "Energetic initiative, courage, real estate transactions, dynamic enterprise & technical mastery."
+                "Rahu" -> "Unconventional ambition, foreign connections, rapid technological growth & transformation."
+                "Jupiter" -> "Wisdom, dharmic fulfillment, mentorship, financial stability, progeny & higher philosophy."
+                "Saturn" -> "Disciplined endurance, restructuring, karmic responsibility, perseverance & lasting foundations."
+                "Mercury" -> "Intellectual agility, commercial enterprise, analytical writing, communication & strategic trade."
+                else -> "Karmic unfoldment and life progression."
+            }
+
+            result.add(
+                DasaPeriod(
+                    mahadasaLord = displayName,
+                    antardasaLord = subLord,
+                    startYear = "$runningYear",
+                    endYear = "$endYear",
+                    isCurrent = isCurrent,
+                    theme = description
+                )
+            )
+            runningYear = endYear
+        }
+
+        return result
     }
 
     private fun calculateSun(t: Double): Double {
@@ -340,6 +450,60 @@ object AstronomicalCalculator {
             10 -> ZodiacSign.AQUARIUS
             else -> ZodiacSign.PISCES
         }
+    }
+
+    fun computeHistoricalContext(
+        eventDateStr: String,
+        profile: BirthProfile,
+        tradition: AstrologyTradition
+    ): String {
+        val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        val dateFormats = listOf(
+            "yyyy-MM-dd", "dd MMM yyyy", "dd/MM/yyyy", "dd-MM-yyyy", "yyyy/MM/dd", "yyyy"
+        )
+        var parsedYear = 2024
+        var parsedMonth = 0
+        var parsedDay = 1
+        var dateParsed = false
+
+        val clean = eventDateStr.trim()
+        for (pattern in dateFormats) {
+            try {
+                val df = SimpleDateFormat(pattern, Locale.US)
+                df.isLenient = false
+                val date = df.parse(clean)
+                if (date != null) {
+                    cal.time = date
+                    parsedYear = cal.get(Calendar.YEAR)
+                    parsedMonth = cal.get(Calendar.MONTH) + 1
+                    parsedDay = cal.get(Calendar.DAY_OF_MONTH)
+                    dateParsed = true
+                    break
+                }
+            } catch (_: Exception) {}
+        }
+        if (!dateParsed) {
+            val y = clean.filter { it.isDigit() }.take(4).toIntOrNull()
+            if (y != null) parsedYear = y
+        }
+
+        val jd = 367.0 * parsedYear - floor(7.0 * (parsedYear + floor((parsedMonth + 9.0) / 12.0)) / 4.0) +
+                floor(275.0 * parsedMonth / 9.0) + parsedDay + 1721013.5 + (12.0 / 24.0)
+        val t = (jd - 2451545.0) / 36525.0
+        val ayanamsha = if (tradition == AstrologyTradition.WESTERN_TROPICAL) 0.0 else 23.85308 + (1.397 * t)
+
+        val sunTrop = calculateSun(t)
+        val jupTrop = calculateJupiter(t, sunTrop)
+        val satTrop = calculateSaturn(t, sunTrop)
+
+        val jupSid = (jupTrop - ayanamsha + 720.0) % 360.0
+        val satSid = (satTrop - ayanamsha + 720.0) % 360.0
+
+        val jupSign = getSignByIndex((jupSid / 30.0).toInt())
+        val satSign = getSignByIndex((satSid / 30.0).toInt())
+
+        return "Historical epoch $eventDateStr (JD %.2f): Jupiter transit in %s (%s), Saturn transit in %s (%s). Ephemeris calculated using Lahiri Chitrapaksha ayanamsha (%.2f°)."
+            .format(Locale.US, jd, jupSign.englishName, jupSign.sanskritName, satSign.englishName, satSign.sanskritName, ayanamsha)
     }
 
     private fun getNakshatraName(deg: Double): String {

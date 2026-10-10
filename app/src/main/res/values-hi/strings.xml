@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">ज्योतिष</string>
+    <string name="nav_home">मुख्य</string>
+    <string name="nav_chart">कुंडली</string>
+    <string name="nav_panchangam">पंचांग</string>
+    <string name="nav_ask">सिद्ध एआई</string>
+    <string name="nav_library">ग्रंथालय</string>
+    <string name="nav_profile">प्रोफ़ाइल</string>
+    <string name="btn_continue">जारी रखें</string>
+    <string name="btn_save">सहेजें</string>
+    <string name="btn_sign_in">साइन इन करें</string>
+    <string name="btn_sign_out">साइन आउट</string>
+    <string name="btn_delete">हटाएं</string>
+    <string name="btn_cancel">रद्द करें</string>
+    <string name="btn_pick_date">दिनांक चुनें</string>
+    <string name="btn_pick_time">समय चुनें</string>
+    <string name="btn_add_life_event">जीवन घटना जोड़ें</string>
+    <string name="btn_add_family_member">परिवार के सदस्य की कुंडली जोड़ें</string>
+    <string name="tradition_vedic">वैदिक नाक्षत्र (लाहिड़ी)</string>
+    <string name="tradition_tropical">पाश्चात्य सायन</string>
+    <string name="time_confidence_exact">सटीक (मिनट तक)</string>
+    <string name="time_confidence_approx">अनुमानित (30-60 मिनट)</string>
+    <string name="time_confidence_unknown">अज्ञात समय</string>
+    <string name="title_profile_settings">प्रोफ़ाइल और सेटिंग्स</string>
+    <string name="title_life_timeline">जीवन समयरेखा और पूर्वव्यापी</string>
+    <string name="title_prediction_ledger">भविष्यवाणी बहीखाता</string>
+    <string name="title_evaluation_summary">मूल्यांकन सारांश</string>
+    <string name="label_date_of_birth">जन्म तिथि</string>
+    <string name="label_time_of_birth">जन्म समय</string>
+    <string name="label_place_of_birth">जन्म स्थान</string>
+    <string name="label_event_title">घटना शीर्षक</string>
+    <string name="label_event_date">घटना तिथि</string>
+    <string name="label_event_category">श्रेणी</string>
+    <string name="dialog_delete_profile_title">प्रोफ़ाइल हटाएं?</string>
+    <string name="dialog_delete_profile_desc">क्या आप वाकई इस प्रोफ़ाइल और इसके सभी संबंधित चार्ट और गणनाओं को स्थायी रूप से हटाना चाहते हैं?</string>
+</resources>

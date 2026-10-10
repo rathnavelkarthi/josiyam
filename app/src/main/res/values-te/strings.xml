@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">జ్యోతిషం</string>
+    <string name="nav_home">హోమ్</string>
+    <string name="nav_chart">కుండలి</string>
+    <string name="nav_panchangam">పంచాంగం</string>
+    <string name="nav_ask">సిద్ధ ఏఐ</string>
+    <string name="nav_library">గ్రంథాలయం</string>
+    <string name="nav_profile">ప్రొఫైల్</string>
+    <string name="btn_continue">కొనసాగించు</string>
+    <string name="btn_save">భద్రపరచు</string>
+    <string name="btn_sign_in">సైన్ ఇన్</string>
+    <string name="btn_sign_out">సైన్ అవుట్</string>
+    <string name="btn_delete">తొలగించు</string>
+    <string name="btn_cancel">రద్దు చేయి</string>
+    <string name="btn_pick_date">తేదీని ఎంచుకోండి</string>
+    <string name="btn_pick_time">సమయాన్ని ఎంచుకోండి</string>
+    <string name="btn_add_life_event">జీవిత సంఘటనను జోడించండి</string>
+    <string name="btn_add_family_member">కుటుంబ సభ్యుల జాతకాన్ని జోడించండి</string>
+    <string name="tradition_vedic">వేద సైడీరియల్ (లాహిరి)</string>
+    <string name="tradition_tropical">పాశ్చాత్య ఉష్ణమండల</string>
+    <string name="time_confidence_exact">ఖచ్చితమైనది (నిమిషం వరకు)</string>
+    <string name="time_confidence_approx">సుమారుగా (30-60 నిమిషాలు)</string>
+    <string name="time_confidence_unknown">తెలియని సమయం</string>
+    <string name="title_profile_settings">ప్రొఫైల్ &amp; సెట్టింగ్‌లు</string>
+    <string name="title_life_timeline">జీవిత కాలక్రమం &amp; సమీక్ష</string>
+    <string name="title_prediction_ledger">జాతక ఫలితాల లెడ్జర్</string>
+    <string name="title_evaluation_summary">మూల్యాంకన సారాంశం</string>
+    <string name="label_date_of_birth">పుట్టిన తేదీ</string>
+    <string name="label_time_of_birth">పుట్టిన సమయం</string>
+    <string name="label_place_of_birth">పుట్టిన స్థలం</string>
+    <string name="label_event_title">సంఘటన శీర్షిక</string>
+    <string name="label_event_date">సంఘటన తేదీ</string>
+    <string name="label_event_category">వర్గం</string>
+    <string name="dialog_delete_profile_title">ప్రొఫైల్‌ను తొలగించాలా?</string>
+    <string name="dialog_delete_profile_desc">మీరు నిజంగా ఈ ప్రొఫైల్ మరియు దాని సంబంధిత అన్ని ఫలితాలను శాశ్వతంగా తొలగించాలనుకుంటున్నారా?</string>
+</resources>

@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">ஜோதிஷம்</string>
+    <string name="nav_home">முகப்பு</string>
+    <string name="nav_chart">ராசி கட்டம்</string>
+    <string name="nav_panchangam">பஞ்சாங்கம்</string>
+    <string name="nav_ask">சித்தர் AI</string>
+    <string name="nav_library">நூலகம்</string>
+    <string name="nav_profile">சுயவிவரம்</string>
+    <string name="btn_continue">தொடர்க</string>
+    <string name="btn_save">சேமிக்கவும்</string>
+    <string name="btn_sign_in">உள்நுழைக</string>
+    <string name="btn_sign_out">வெளியேறு</string>
+    <string name="btn_delete">நீக்குக</string>
+    <string name="btn_cancel">ரத்து செய்</string>
+    <string name="btn_pick_date">தேதி தேர்வு</string>
+    <string name="btn_pick_time">நேரம் தேர்வு</string>
+    <string name="btn_add_life_event">வாழ்க்கை நிகழ்வைச் சேர்க்க</string>
+    <string name="btn_add_family_member">குடும்ப உறுப்பினர் ஜாதகம் சேர்க்க</string>
+    <string name="tradition_vedic">வேத சிடீரியல் (லாகிரி)</string>
+    <string name="tradition_tropical">மேற்கத்திய வெப்பமண்டல</string>
+    <string name="time_confidence_exact">துல்லியமானது (நிமிடம் வரை)</string>
+    <string name="time_confidence_approx">தோராயமானது (30-60 நிமி)</string>
+    <string name="time_confidence_unknown">தெரியாத நேரம்</string>
+    <string name="title_profile_settings">சுயவிவரம் &amp; அமைப்புகள்</string>
+    <string name="title_life_timeline">வாழ்க்கை காலவரிசை &amp; பகுப்பாய்வு</string>
+    <string name="title_prediction_ledger">முன்கணிப்பு பதிவேடு</string>
+    <string name="title_evaluation_summary">மதிப்பீட்டு சுருக்கம்</string>
+    <string name="label_date_of_birth">பிறந்த தேதி</string>
+    <string name="label_time_of_birth">பிறந்த நேரம்</string>
+    <string name="label_place_of_birth">பிறந்த இடம்</string>
+    <string name="label_event_title">நிகழ்வு தலைப்பு</string>
+    <string name="label_event_date">நிகழ்வு தேதி</string>
+    <string name="label_event_category">பிரிவு</string>
+    <string name="dialog_delete_profile_title">சுயவிவரத்தை நீக்கவா?</string>
+    <string name="dialog_delete_profile_desc">இந்த சுயவிவரம் மற்றும் அதன் கணிப்புகள் அனைத்தையும் நிரந்தரமாக நீக்க விரும்புகிறீர்களா?</string>
+</resources>

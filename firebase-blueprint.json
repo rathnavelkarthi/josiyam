@@ -1,0 +1,70 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account and preferences",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "selectedTradition": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "createdAt"]
+    },
+    "BirthProfile": {
+      "title": "BirthProfile",
+      "description": "Jyotisha astrological birth chart profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "dateOfBirth": { "type": "string" },
+        "timeOfBirth": { "type": "string" },
+        "placeOfBirth": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "timeZone": { "type": "string" },
+        "gender": { "type": "string" },
+        "timeConfidence": { "type": "string" },
+        "tradition": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "dateOfBirth", "timeOfBirth", "placeOfBirth", "createdAt"]
+    },
+    "Reading": {
+      "title": "Reading",
+      "description": "Astrological interpretation report or reading ledger",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "profileId": { "type": "string" },
+        "question": { "type": "string" },
+        "category": { "type": "string" },
+        "summary": { "type": "string" },
+        "detailedAnalysis": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "summary", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile document"
+    },
+    "/users/{userId}/birth_profiles/{profileId}": {
+      "schema": { "$ref": "#/entities/BirthProfile" },
+      "description": "User birth chart profiles"
+    },
+    "/users/{userId}/readings/{readingId}": {
+      "schema": { "$ref": "#/entities/Reading" },
+      "description": "User readings ledger"
+    }
+  }
+}

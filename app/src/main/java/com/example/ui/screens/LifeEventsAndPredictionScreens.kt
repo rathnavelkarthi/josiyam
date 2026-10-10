@@ -17,10 +17,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.app.DatePickerDialog
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import com.example.data.models.*
 import com.example.ui.components.CelestialBackground
 import com.example.ui.components.CelestialBadge
@@ -97,6 +102,23 @@ fun LifeTimelineScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Prominent Add Life Event button
+            Button(
+                onClick = { showAddDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = CelestialGold),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("add_life_event_primary_btn")
+            ) {
+                Icon(Icons.Default.AddCircleOutline, contentDescription = null, tint = CelestialBg, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Add Life Event", color = CelestialBg, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+
             Spacer(modifier = Modifier.height(14.dp))
 
             Column(
@@ -167,34 +189,67 @@ fun LifeTimelineScreen(
         }
 
         if (showAddDialog) {
+            val context = LocalContext.current
+            val openEventDatePicker = {
+                val cal = Calendar.getInstance()
+                try {
+                    val df = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                    val parsed = df.parse(dateInput.trim())
+                    if (parsed != null) cal.time = parsed
+                } catch (_: Exception) {}
+
+                DatePickerDialog(
+                    context,
+                    { _, year, month, dayOfMonth ->
+                        val selectedCal = Calendar.getInstance()
+                        selectedCal.set(year, month, dayOfMonth)
+                        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                        dateInput = formatter.format(selectedCal.time)
+                    },
+                    cal.get(Calendar.YEAR),
+                    cal.get(Calendar.MONTH),
+                    cal.get(Calendar.DAY_OF_MONTH)
+                ).show()
+            }
+
             AlertDialog(
                 onDismissRequest = { showAddDialog = false },
-                title = { Text("Add Life Milestone", color = CelestialTextPrimary) },
+                title = { Text("Add Life Event", color = CelestialTextPrimary, fontWeight = FontWeight.Bold) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Record personal milestones (education, career, relocation) to examine historical astrological cycles.",
+                            fontSize = 12.sp,
+                            color = CelestialTextSecondary
+                        )
                         OutlinedTextField(
                             value = titleInput,
                             onValueChange = { titleInput = it },
                             label = { Text("Event Title") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("event_title_input")
                         )
                         OutlinedTextField(
                             value = categoryInput,
                             onValueChange = { categoryInput = it },
                             label = { Text("Category (Career, Education, etc.)") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("event_category_input")
                         )
                         OutlinedTextField(
                             value = dateInput,
                             onValueChange = { dateInput = it },
-                            label = { Text("Date (YYYY-MM-DD or YYYY)") },
-                            modifier = Modifier.fillMaxWidth()
+                            label = { Text("Event Date (Tap icon to pick)") },
+                            trailingIcon = {
+                                IconButton(onClick = openEventDatePicker) {
+                                    Icon(Icons.Default.CalendarToday, contentDescription = "Pick Date", tint = CelestialGold)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("event_date_input")
                         )
                         OutlinedTextField(
                             value = notesInput,
                             onValueChange = { notesInput = it },
                             label = { Text("Private Notes (Optional)") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().testTag("event_notes_input")
                         )
                     }
                 },
@@ -216,9 +271,10 @@ fun LifeTimelineScreen(
                                 showAddDialog = false
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = CelestialGold)
+                        colors = ButtonDefaults.buttonColors(containerColor = CelestialGold),
+                        modifier = Modifier.testTag("save_event_confirm_btn")
                     ) {
-                        Text("Save Milestone", color = CelestialBg)
+                        Text("Save Event", color = CelestialBg, fontWeight = FontWeight.SemiBold)
                     }
                 },
                 dismissButton = {
